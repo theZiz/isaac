@@ -394,9 +394,6 @@ int main(int argc, char **argv)
 			#endif
 			update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
 			simulation_time +=visualization->getTicksUs() - start_simulation;
-			#if ISAAC_BENCHMARK == 1
-				pause = true;
-			#endif
 		}
 		
 		step++;
