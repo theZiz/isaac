@@ -163,7 +163,9 @@ int main(int argc, char **argv)
 	MPI_Bcast(&id,sizeof(id), MPI_INT, 0, MPI_COMM_WORLD);
 	char name[32];
 	sprintf(name,"Example_%i",id);
-	printf("Using name %s\n",name);
+	#if ISAAC_BENCHMARK == 0
+		printf("Using name %s\n",name);
+	#endif
 	
 	//This defines the size of the generated rendering
 	isaac_size2 framebuffer_size =
@@ -325,6 +327,11 @@ int main(int argc, char **argv)
 		json_object_set_new( visualization->getJsonMetaRoot(), "video_send_time", json_string( "video_send_time" ) );
 		json_object_set_new( visualization->getJsonMetaRoot(), "buffer_time", json_string( "buffer_time" ) );
 	}
+	#if ISAAC_BENCHMARK == 1
+		visualization->distance += 1.0f;
+		visualization->updateModelview();
+		json_object_set_new( visualization->json_root, "distance", json_real( visualization->distance ) );
+	#endif
 
 	//finish init and sending the meta data scription to the isaac server
 	if (visualization->init())
@@ -357,6 +364,14 @@ int main(int argc, char **argv)
 	int step = 0;
 	if (rank == 0)
 		json_object_set_new( visualization->getJsonMetaRoot(), "interval", json_integer( interval ) );
+		
+	#if ISAAC_BENCHMARK == 1
+		int bm_step = 0;
+		char buffer[32];
+		sprintf(buffer,"rank_%03i.txt",rank);
+		FILE * pFile = fopen( buffer, "w" );
+		fprintf(pFile,"Step\tdraw\tsort\tkernel\tcopy\tmerge\tvideo\tbuffer\n");
+	#endif
 
 	///////////////
 	// Main loop //
@@ -375,6 +390,9 @@ int main(int argc, char **argv)
 			#endif
 			update_data(stream,hostBuffer1, deviceBuffer1, hostBuffer2, deviceBuffer2, prod, a,local_size,position,global_size);
 			simulation_time +=visualization->getTicksUs() - start_simulation;
+			#if ISAAC_BENCHMARK == 1
+				pause = true;
+			#endif
 		}
 		
 		step++;
@@ -384,6 +402,7 @@ int main(int argc, char **argv)
 			///////////////////
 			// Metadata fill //
 			///////////////////
+		#if ISAAC_BENCHMARK == 0
 			if (rank == 0)
 			{
 				json_object_set_new( visualization->getJsonMetaRoot(), "counting variable", json_real( a ) );
@@ -395,6 +414,7 @@ int main(int argc, char **argv)
 				json_object_set_new( visualization->getJsonMetaRoot(), "copy_time" , json_integer( visualization->copy_time ) );
 				json_object_set_new( visualization->getJsonMetaRoot(), "video_send_time" , json_integer( visualization->video_send_time ) );
 				json_object_set_new( visualization->getJsonMetaRoot(), "buffer_time" , json_integer( visualization->buffer_time ) );
+		#endif
 				full_drawing_time    += drawing_time;
 				full_simulation_time += simulation_time;
 				sorting_time         += visualization->sorting_time;
@@ -411,7 +431,9 @@ int main(int argc, char **argv)
 				visualization->copy_time = 0;
 				visualization->video_send_time = 0;
 				visualization->buffer_time = 0;
+		#if ISAAC_BENCHMARK == 0
 			}
+		#endif
 
 			///////////////////
 			// Visualization //
@@ -451,6 +473,28 @@ int main(int argc, char **argv)
 			//////////////////
 			// Debug output //
 			//////////////////
+			#if ISAAC_BENCHMARK == 1
+				merge_time -= kernel_time + copy_time;
+				fprintf(pFile,"%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\n",
+					bm_step,
+					full_drawing_time,
+					sorting_time,
+					kernel_time,
+					copy_time,
+					merge_time,
+					video_send_time,
+					buffer_time
+				);
+				sorting_time = 0;
+				merge_time = 0;
+				kernel_time = 0;
+				copy_time = 0;
+				video_send_time = 0;
+				buffer_time = 0;
+				full_drawing_time = 0;
+				full_simulation_time = 0;
+			#endif
+		#if ISAAC_BENCHMARK == 0
 			if (rank == 0)
 			{
 				int end = visualization->getTicksUs();
@@ -480,11 +524,49 @@ int main(int argc, char **argv)
 					count = 0;
 				}
 			}
+		#endif
 		}
-	}	
+		#if ISAAC_BENCHMARK == 1
+			bm_step++;
+			if (rank == 0)
+			{
+				json_t* message = json_object();
+				json_object_set_new( message, "type", json_string( "feedback" ) );
+				json_t* js = json_array();
+				json_object_set_new( message, "rotation axis", js);
+				if (bm_step < 360)
+				{
+					json_array_append_new( js, json_real( 1 ) );
+					json_array_append_new( js, json_real( 0 ) );
+					json_array_append_new( js, json_real( 0 ) );
+				}
+				else
+				if (bm_step < 2*360)
+				{
+					json_array_append_new( js, json_real( 0 ) );
+					json_array_append_new( js, json_real( 1 ) );
+					json_array_append_new( js, json_real( 0 ) );
+				}
+				else
+				{
+					json_array_append_new( js, json_real( 0 ) );
+					json_array_append_new( js, json_real( 0 ) );
+					json_array_append_new( js, json_real( 1 ) );
+				}
+				json_array_append_new( js, json_real( 1 ) );
+				visualization->communicator->addMessage( message );
+			}
+			if (bm_step == 3*360)
+				force_exit = 1;
+		#endif
+	}
+	#if ISAAC_BENCHMARK == 1
+		fclose( pFile );
+	#endif
 	MPI_Barrier(MPI_COMM_WORLD);
+#if ISAAC_BENCHMARK == 0
 	printf("%i finished\n",rank);
-
+#endif
 	////////////////////
 	// Winter wrap up //
 	////////////////////
