@@ -207,6 +207,14 @@ class IsaacCommunicator
 			pthread_cancel(readThread);
 			pthread_mutex_destroy(&deleteMessageMutex);
 		}
+		#if ISAAC_BENCHMARK == 1
+			void addMessage( json_t* content )
+			{
+				pthread_mutex_lock(&deleteMessageMutex);
+				messageList.push_back( content );
+				pthread_mutex_unlock(&deleteMessageMutex);
+			}
+		#endif
 	private:
 		void readAndSetMessages()
 		{

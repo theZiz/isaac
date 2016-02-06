@@ -1217,7 +1217,9 @@ class IsaacVisualization
         uint64_t copy_time;
         uint64_t sorting_time;
         uint64_t buffer_time;
-    private:        
+#if ISAAC_BENCHMARK == 0
+    private:
+#endif
         static void drawCallBack(
             const IceTDouble * projection_matrix,
             const IceTDouble * modelview_matrix,
