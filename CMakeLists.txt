@@ -92,9 +92,13 @@ target_link_libraries(isaac ${LIBS})
 
 option(BUILD_EXAMPLE_CUDA "Build the example using cuda." ON)
 option(BUILD_EXAMPLE_ALPAKA "Build the example using alpaka." OFF)
+option(BUILD_EXAMPLE_BENCHMARK "Building benchmark examples instead of the regular ones" OFF)
 
 
 if (BUILD_EXAMPLE_CUDA OR BUILD_EXAMPLE_ALPAKA)
+	if (BUILD_EXAMPLE_BENCHMARK)
+		add_definitions(-DISAAC_BENCHMARK)
+	endif()
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${JANSSON_INCLUDE_DIRS})
 	set(EXAMPLE_INCLUDE ${EXAMPLE_INCLUDE} ${JPEG_INCLUDE_DIR})
 
