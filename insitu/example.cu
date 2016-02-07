@@ -23,6 +23,19 @@ using namespace isaac;
 #define VOLUME_Y 64
 #define VOLUME_Z 64
 
+#if ISAAC_BENCHMARK == 1
+	#define ISAAC_PRE_COMMAND
+	//#define ISAAC_PRE_COMMAND \
+	if (rank == 0) \
+	{ \
+		json_t* message = json_object(); \
+		json_object_set_new( message, "type", json_string( "feedback" ) ); \
+		json_object_set_new( message, "interpolation", json_boolean( true ) ); \
+		json_object_set_new( message, "iso surface", json_boolean( true ) ); \
+		visualization->communicator->addMessage( message ); \
+	}
+#endif
+
 //////////////////////
 // Example Source 1 //
 //////////////////////
@@ -371,6 +384,7 @@ int main(int argc, char **argv)
 		sprintf(buffer,"rank_%03i.txt",rank);
 		FILE * pFile = fopen( buffer, "w" );
 		fprintf(pFile,"Step\tdraw\tsort\tkernel\tcopy\tmerge\tvideo\tbuffer\n");
+		ISAAC_PRE_COMMAND
 	#endif
 
 	///////////////
