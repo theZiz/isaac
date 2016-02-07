@@ -384,8 +384,9 @@ int main(int argc, char **argv)
 		char buffer[32];
 		sprintf(buffer,"rank_%03i.txt",rank);
 		FILE * pFile = fopen( buffer, "w" );
-		fprintf(pFile,"Step\tdraw\tsort\tkernel\tcopy\tmerge\tvideo\tbuffer\n");
+		fprintf(pFile,"Step\tdraw\tsort\tkernel\tcopy\tmerge\tvideo\tbuffer\ticet_render\ticet_buffer_read\ticet_buffer_write\ticet_compress\ticet_blend\ticet_collect\ticet_total_draw\ticet_composite\ticet_send_bytes\n");
 		ISAAC_PRE_COMMAND
+		IceTInt icet_send_bytes = 0;
 	#endif
 
 	///////////////
@@ -491,7 +492,25 @@ int main(int argc, char **argv)
 			//////////////////
 			#if ISAAC_BENCHMARK == 1
 				merge_time -= kernel_time + copy_time;
-				fprintf(pFile,"%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\n",
+				IceTFloat icet_render;
+				IceTFloat icet_buffer_read;
+				IceTFloat icet_buffer_write;
+				IceTFloat icet_compress;
+				IceTFloat icet_blend;
+				IceTFloat icet_collect;
+				IceTFloat icet_total_draw;
+				IceTFloat icet_composite;
+				IceTInt icet_send_new_bytes;
+				icetGetFloatv( ICET_RENDER_TIME, &icet_render );
+				icetGetFloatv( ICET_BUFFER_READ_TIME, &icet_buffer_read );
+				icetGetFloatv( ICET_BUFFER_WRITE_TIME, &icet_buffer_write );
+				icetGetFloatv( ICET_COMPRESS_TIME, &icet_compress );
+				icetGetFloatv( ICET_BLEND_TIME, &icet_blend );
+				icetGetFloatv( ICET_COLLECT_TIME, &icet_collect );
+				icetGetFloatv( ICET_TOTAL_DRAW_TIME, &icet_total_draw );
+				icetGetFloatv( ICET_COMPOSITE_TIME, &icet_composite );
+				icetGetIntegerv( ICET_FRAME_COUNT, &icet_send_new_bytes );
+				fprintf(pFile,"%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\t%i\n",
 					bm_step,
 					full_drawing_time,
 					sorting_time,
@@ -499,8 +518,18 @@ int main(int argc, char **argv)
 					copy_time,
 					merge_time,
 					video_send_time,
-					buffer_time
+					buffer_time,
+					int(icet_render*1000000.0f),
+					int(icet_buffer_read*1000000.0f),
+					int(icet_buffer_write*1000000.0f),
+					int(icet_compress*1000000.0f),
+					int(icet_blend*1000000.0f),
+					int(icet_collect*1000000.0f),
+					int(icet_total_draw*1000000.0f),
+					int(icet_composite*1000000.0f),
+					icet_send_new_bytes - icet_send_bytes
 				);
+				icet_send_bytes = icet_send_new_bytes;
 				sorting_time = 0;
 				merge_time = 0;
 				kernel_time = 0;
