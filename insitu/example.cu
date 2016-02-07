@@ -34,6 +34,36 @@ using namespace isaac;
 		json_object_set_new( message, "iso surface", json_boolean( true ) ); \
 		visualization->communicator->addMessage( message ); \
 	}
+	//#define ISAAC_PRE_COMMAND \
+	if (rank == 0) \
+	{ \
+		json_t* message = json_object(); \
+		json_object_set_new( message, "type", json_string( "feedback" ) ); \
+		json_t* js = json_array(); \
+		json_object_set_new( message, "weight", js ); \
+		json_array_append_new( js, json_real( 0 ) ); \
+		json_array_append_new( js, json_real( 1 ) ); \
+		visualization->communicator->addMessage( message ); \
+	}
+	//#define ISAAC_PRE_COMMAND \
+	if (rank == 0) \
+	{ \
+		json_t* message = json_object(); \
+		json_object_set_new( message, "type", json_string( "feedback" ) ); \
+		json_t* js = json_array(); \
+		json_object_set_new( message, "functions", js ); \
+		json_array_append_new( js, json_string( (char*)"mul(1.1) | add(0.001) | length" ) ); \
+		json_array_append_new( js, json_string( (char*)"mul(1.1) | add(0.001) | mul(0.9)" ) ); \
+		visualization->communicator->addMessage( message ); \
+	}
+	//#define ISAAC_PRE_COMMAND \
+	if (rank == 0) \
+	{ \
+		json_t* message = json_object(); \
+		json_object_set_new( message, "type", json_string( "feedback" ) ); \
+		json_object_set_new( message, "step", json_real( 5.0 ) ); \
+		visualization->communicator->addMessage( message ); \
+	}
 #endif
 
 //////////////////////
