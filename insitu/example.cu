@@ -224,10 +224,10 @@ int main(int argc, char **argv)
 		using AccDim = alpaka::dim::DimInt<3>;
 		using SimDim = alpaka::dim::DimInt<3>;
 		using DatDim = alpaka::dim::DimInt<1>;
-		//using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
-		//using Stream  = alpaka::stream::StreamCudaRtSync;
-		using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
-		using Stream  = alpaka::stream::StreamCpuSync;
+		using Acc = alpaka::acc::AccGpuCudaRt<AccDim, size_t>;
+		using Stream  = alpaka::stream::StreamCudaRtSync;
+		//using Acc = alpaka::acc::AccCpuOmp2Blocks<AccDim, size_t>;
+		//using Stream  = alpaka::stream::StreamCpuSync;
 		//using Acc = alpaka::acc::AccCpuOmp2Threads<AccDim, size_t>;
 		//using Stream  = alpaka::stream::StreamCpuSync;
 				
@@ -608,14 +608,14 @@ int main(int argc, char **argv)
 				json_object_set_new( message, "type", json_string( "feedback" ) );
 				json_t* js = json_array();
 				json_object_set_new( message, "rotation axis", js);
-				if (bm_step < 360)
+				if (bm_step % (3*360)  < 360)
 				{
 					json_array_append_new( js, json_real( 1 ) );
 					json_array_append_new( js, json_real( 0 ) );
 					json_array_append_new( js, json_real( 0 ) );
 				}
 				else
-				if (bm_step < 2*360)
+				if (bm_step % (3*360) < 2*360)
 				{
 					json_array_append_new( js, json_real( 0 ) );
 					json_array_append_new( js, json_real( 1 ) );
@@ -630,7 +630,7 @@ int main(int argc, char **argv)
 				json_array_append_new( js, json_real( 1 ) );
 				visualization->communicator->addMessage( message );
 			}
-			if (bm_step == 3*360)
+			if (bm_step == 6*360)
 				force_exit = 1;
 		#endif
 	}
