@@ -53,6 +53,7 @@
 				Interval: <input type="range" value="1" min="1" max="32" id="interval_range">
 				<span id="interval_span">1</span>
 				<input type="button" value="Set" id="interval_change">
+				<input type="button" value="Orthographic" id="ortho">
 			</form>
 			<div id="functions_div"></div>
 			<div id="weight_div"></div>
@@ -133,6 +134,7 @@ var projection = [
 	0, 0, 1, 0,
 	0, 0, 0, 1
 ];
+var save_projection = projection;
 var position = [
 	0,
 	0,
@@ -587,6 +589,35 @@ document.getElementById("interval_change").onclick = function()
 	socket.send(JSON.stringify(obj));
 };
 
+document.getElementById("ortho").onclick = function()
+{
+	if (document.getElementById("ortho").value == "Orthographic")
+	{
+		saved_projection = projection;
+		x = preview.clientWidth/preview.clientHeight;
+		projection = [
+			0.5/x, 0.0,  0.0, 0.0,
+			0.0, 0.5, 0.0, 0.0,
+			-2.0/(100.0-1.0), 0.0, 0.0, 0.0,
+			-(100.0+1.0)/(100.0-1.0), 0.0, 0.0, 1.0
+		];
+		document.getElementById("ortho").value = "Perspective";
+	}
+	else
+	{
+		projection = saved_projection;
+		document.getElementById("ortho").value = "Orthographic";
+	}
+	document.getElementById("url").value = JSON.stringify(projection);
+	updateZNear();
+	var obj =
+	{
+		"type" : "feedback",
+		"observe id" : observe_id,
+		"projection" : projection
+	};
+	socket.send(JSON.stringify(obj));
+};
 document.getElementById("clip_add").onclick = function()
 {
 	var obj =
