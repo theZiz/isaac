@@ -27,6 +27,10 @@ if(${ISAAC_STEREO} STREQUAL "Anaglyph")
 	add_definitions(-DISAAC_STEREO=2)
 endif()
 
+option(ISAAC_BENCHMARK "Building benchmark examples instead of the regular ones" OFF)
+if (ISAAC_BENCHMARK)
+	add_definitions(-DISAAC_BENCHMARK)
+endif()
 
 if (ISAAC_ALPAKA)
 	ALPAKA_ADD_EXECUTABLE(example_alpaka ${CMAKE_SOURCE_DIR}/example.cu)
