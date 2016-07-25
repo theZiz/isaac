@@ -198,7 +198,7 @@ class IsaacVisualization
                         );
                         pointer_array.pointer[I] = alpaka::mem::view::getPtrNative( alpaka_vector.back() );
                     #else
-                        ISAAC_CUDA_CHECK(cudaMalloc((void**)&(pointer_array.pointer[I]), sizeof(isaac_float_dim< TSource::feature_dim >) * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE) ) );
+                        ISAAC_CUDA_CHECK(cudaMalloc((void**)&(pointer_array.pointer[I]), sizeof(Vector<float, TSource::feature_dim >) * (local_size[0] + 2 * ISAAC_GUARD_SIZE) * (local_size[1] + 2 * ISAAC_GUARD_SIZE) * (local_size[2] + 2 * ISAAC_GUARD_SIZE) ) );
                     #endif
                 }
             }
@@ -233,30 +233,30 @@ class IsaacVisualization
                 source.update( enabled, pointer );
                 if (!TSource::persistent && enabled)
                 {
-                    isaac_size2 grid_size=
+                    Vector<size_t,2> grid_size=
                     {
                         size_t((local_size[0] + ISAAC_GUARD_SIZE * 2 + 15)/16),
                         size_t((local_size[1] + ISAAC_GUARD_SIZE * 2 + 15)/16),
                     };
-                    isaac_size2 block_size=
+                    Vector<size_t,2> block_size=
                     {
                         size_t(16),
                         size_t(16),
                     };
-                    isaac_int3 local_size_array = { isaac_int(local_size[0]), isaac_int(local_size[1]), isaac_int(local_size[2]) };
+                    Vector<int,3> local_size_array = { isaac_int(local_size[0]), isaac_int(local_size[1]), isaac_int(local_size[2]) };
                     #if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                         if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
 #endif
                         {
-                            grid_size.x = size_t(local_size[0] + ISAAC_GUARD_SIZE * 2);
-                            grid_size.y = size_t(local_size[0] + ISAAC_GUARD_SIZE * 2);
-                            block_size.x = size_t(1);
-                            block_size.y = size_t(1);
+                            grid_size.value.x = size_t(local_size[0] + ISAAC_GUARD_SIZE * 2);
+                            grid_size.value.y = size_t(local_size[0] + ISAAC_GUARD_SIZE * 2);
+                            block_size.value.x = size_t(1);
+                            block_size.value.y = size_t(1);
                         }
                         const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
-                        const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
-                        const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
+                        const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.value.x, block_size.value.y);
+                        const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.value.x, grid_size.value.y);
                         auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
                         updateBufferKernel<TSource> kernel;
                         auto const instance
@@ -273,8 +273,8 @@ class IsaacVisualization
                         alpaka::stream::enqueue(stream, instance);
                         alpaka::wait::wait(stream);
                     #else
-                        dim3 block (block_size.x, block_size.y);
-                        dim3 grid  (grid_size.x, grid_size.y);
+                        dim3 block (block_size.value.x, block_size.value.y);
+                        dim3 grid  (grid_size.value.x, grid_size.value.y);
                         updateBufferKernel<<<grid,block>>>( source, pointer_array.pointer[ I ], local_size_array );
                         ISAAC_CUDA_CHECK(cudaDeviceSynchronize());
                     #endif
@@ -309,31 +309,31 @@ class IsaacVisualization
                 #endif
             ) const
             {
-                isaac_size2 grid_size=
+                Vector<size_t,2> grid_size=
                 {
                     size_t((local_size[0]+15)/16),
                     size_t((local_size[1]+15)/16),
                 };
-                isaac_size2 block_size=
+                Vector<size_t,2> block_size=
                 {
                     size_t(16),
                     size_t(16),
                 };
-                isaac_int3 local_size_array = { isaac_int(local_size[0]), isaac_int(local_size[1]), isaac_int(local_size[2]) };
-                minmax_struct local_minmax_array_h[ local_size_array.x * local_size_array.y ];
+                Vector<int,3> local_size_array = { isaac_int(local_size[0]), isaac_int(local_size[1]), isaac_int(local_size[2]) };
+                minmax_struct local_minmax_array_h[ local_size_array.value.x * local_size_array.value.y ];
                 #if ISAAC_ALPAKA == 1
 #if ALPAKA_ACC_GPU_CUDA_ENABLED == 1
                     if ( mpl::not_<boost::is_same<TAcc, alpaka::acc::AccGpuCudaRt<TAccDim, size_t> > >::value )
 #endif
                     {
-                        grid_size.x = size_t(local_size[0]);
-                        grid_size.y = size_t(local_size[0]);
-                        block_size.x = size_t(1);
-                        block_size.y = size_t(1);
+                        grid_size.value.x = size_t(local_size[0]);
+                        grid_size.value.y = size_t(local_size[0]);
+                        block_size.value.x = size_t(1);
+                        block_size.value.y = size_t(1);
                     }
                     const alpaka::Vec<TAccDim, size_t> threads (size_t(1), size_t(1), size_t(1));
-                    const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.x, block_size.y);
-                    const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.x, grid_size.y);
+                    const alpaka::Vec<TAccDim, size_t> blocks  (size_t(1), block_size.value.x, block_size.value.y);
+                    const alpaka::Vec<TAccDim, size_t> grid    (size_t(1), grid_size.value.x, grid_size.value.y);
                     auto const workdiv(alpaka::workdiv::WorkDivMembers<TAccDim, size_t>(grid,blocks,threads));
                     minMaxKernel<TSource> kernel;
                     auto const instance
@@ -351,17 +351,17 @@ class IsaacVisualization
                     );
                     alpaka::stream::enqueue(stream, instance);
                     alpaka::wait::wait(stream);
-                    alpaka::mem::view::ViewPlainPtr<THost, minmax_struct, TFraDim, size_t> minmax_buffer(local_minmax_array_h, host, alpaka::Vec<TFraDim, size_t>::Vec(size_t(local_size_array.x * local_size_array.y)));
-                    alpaka::mem::view::copy( stream, minmax_buffer, local_minmax, alpaka::Vec<TFraDim, size_t>::Vec(size_t(local_size_array.x * local_size_array.y)));
+                    alpaka::mem::view::ViewPlainPtr<THost, minmax_struct, TFraDim, size_t> minmax_buffer(local_minmax_array_h, host, alpaka::Vec<TFraDim, size_t>::Vec(size_t(local_size_array.value.x * local_size_array.value.y)));
+                    alpaka::mem::view::copy( stream, minmax_buffer, local_minmax, alpaka::Vec<TFraDim, size_t>::Vec(size_t(local_size_array.value.x * local_size_array.value.y)));
                 #else
-                    dim3 block (block_size.x, block_size.y);
-                    dim3 grid  (grid_size.x, grid_size.y);
+                    dim3 block (block_size.value.x, block_size.value.y);
+                    dim3 grid  (grid_size.value.x, grid_size.value.y);
                     minMaxKernel<<<grid,block>>>( source, I, local_minmax, local_size_array, pointer_array.pointer[ I ]);
-                    ISAAC_CUDA_CHECK(cudaMemcpy( local_minmax_array_h, local_minmax, sizeof(minmax_struct)*local_size_array.x * local_size_array.y, cudaMemcpyDeviceToHost));
+                    ISAAC_CUDA_CHECK(cudaMemcpy( local_minmax_array_h, local_minmax, sizeof(minmax_struct)*local_size_array.value.x * local_size_array.value.y, cudaMemcpyDeviceToHost));
                 #endif
                 minmax.min[ I ] =  FLT_MAX;
                 minmax.max[ I ] = -FLT_MAX;
-                for (int i = 0; i < local_size_array.x * local_size_array.y; i++)
+                for (int i = 0; i < local_size_array.value.x * local_size_array.value.y; i++)
                 {
                     if ( local_minmax_array_h[i].min < minmax.min[ I ])
                         minmax.min[ I ] = local_minmax_array_h[i].min;
@@ -381,7 +381,7 @@ class IsaacVisualization
             const isaac_int master,
             const std::string server_url,
             const isaac_uint server_port,
-            const isaac_size2 framebuffer_size,
+            const Vector<size_t,2> framebuffer_size,
             const TDomainSize global_size,
             const TDomainSize local_size,
             const TDomainSize position,
@@ -414,7 +414,7 @@ class IsaacVisualization
             interpolation(false),
             iso_surface(false),
             step(isaac_float( ISAAC_DEFAULT_STEP )),
-            framebuffer_prod(size_t(framebuffer_size.x) * size_t(framebuffer_size.y)),
+            framebuffer_prod(size_t(framebuffer_size.value.x) * size_t(framebuffer_size.value.y)),
             sources( sources ),
             scale( scale ),
             icet_bounding_box( true )
@@ -515,16 +515,16 @@ class IsaacVisualization
             {
                 source_weight.value[i] = ISAAC_DEFAULT_WEIGHT;
                 #if ISAAC_ALPAKA == 1
-                    transfer_d_buf.push_back( alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>( acc, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
-                    transfer_h_buf.push_back( alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> ( alpaka::mem::buf::alloc<isaac_float4, size_t>(host, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
+                    transfer_d_buf.push_back( alpaka::mem::buf::Buf<TDevAcc, Vector<float,4>, TTexDim, size_t> ( alpaka::mem::buf::alloc<Vector<float,4>, size_t>( acc, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
+                    transfer_h_buf.push_back( alpaka::mem::buf::Buf<  THost, Vector<float,4>, TTexDim, size_t> ( alpaka::mem::buf::alloc<Vector<float,4>, size_t>(host, alpaka::Vec<TTexDim, size_t> ( TTransfer_size ) ) ) );
                     transfer_d.pointer[i] = alpaka::mem::view::getPtrNative( transfer_d_buf[i] );
                     transfer_h.pointer[i] = alpaka::mem::view::getPtrNative( transfer_h_buf[i] );
                 #else
-                    ISAAC_CUDA_CHECK(cudaMalloc((isaac_float4**)&(transfer_d.pointer[i]), sizeof(isaac_float4)*TTransfer_size));
-                    transfer_h.pointer[i] = (isaac_float4*)malloc( sizeof(isaac_float4)*TTransfer_size );
+                    ISAAC_CUDA_CHECK(cudaMalloc((Vector<float,4>**)&(transfer_d.pointer[i]), sizeof(Vector<float,4>)*TTransfer_size));
+                    transfer_h.pointer[i] = (Vector<float,4>*)malloc( sizeof(Vector<float,4>)*TTransfer_size );
                 #endif
-                transfer_h.description[i].insert( std::pair< isaac_uint, isaac_float4> (0             , getHSVA(isaac_float(2*i)*M_PI/isaac_float(boost::mpl::size< TSourceList >::type::value),1,1,0) ));
-                transfer_h.description[i].insert( std::pair< isaac_uint, isaac_float4> (TTransfer_size, getHSVA(isaac_float(2*i)*M_PI/isaac_float(boost::mpl::size< TSourceList >::type::value),1,1,1) ));
+                transfer_h.description[i].insert( std::pair< isaac_uint, Vector<float,4>> (0             , getHSVA(isaac_float(2*i)*M_PI/isaac_float(boost::mpl::size< TSourceList >::type::value),1,1,0) ));
+                transfer_h.description[i].insert( std::pair< isaac_uint, Vector<float,4>> (TTransfer_size, getHSVA(isaac_float(2*i)*M_PI/isaac_float(boost::mpl::size< TSourceList >::type::value),1,1,1) ));
             }
             updateTransfer();
 
@@ -542,7 +542,7 @@ class IsaacVisualization
             {
                 icetContext[pass] = icetCreateContext(icetComm);
                 icetResetTiles();
-                icetAddTile(0, 0, framebuffer_size.x, framebuffer_size.y, master);
+                icetAddTile(0, 0, framebuffer_size.value.x, framebuffer_size.value.y, master);
                 //icetStrategy(ICET_STRATEGY_DIRECT);
                 icetStrategy(ICET_STRATEGY_SEQUENTIAL);
                 //icetStrategy(ICET_STRATEGY_REDUCE);
@@ -563,7 +563,7 @@ class IsaacVisualization
                 icetSetDepthFormat(ICET_IMAGE_DEPTH_NONE);
                 icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
                 icetEnable(ICET_ORDERED_COMPOSITE);
-                icetPhysicalRenderSize(framebuffer_size.x, framebuffer_size.y);
+                icetPhysicalRenderSize(framebuffer_size.value.x, framebuffer_size.value.y);
                 icetDrawCallback( drawCallBack );
             }
             icetDestroyMPICommunicator(icetComm);
@@ -575,8 +575,8 @@ class IsaacVisualization
                 json_object_set_new( json_root, "type", json_string( "register" ) );
                 json_object_set_new( json_root, "name", json_string( name.c_str() ) );
                 json_object_set_new( json_root, "nodes", json_integer( numProc ) );
-                json_object_set_new( json_root, "framebuffer width", json_integer ( compbuffer_size.x ) );
-                json_object_set_new( json_root, "framebuffer height", json_integer ( compbuffer_size.y ) );
+                json_object_set_new( json_root, "framebuffer width", json_integer ( compbuffer_size.value.x ) );
+                json_object_set_new( json_root, "framebuffer height", json_integer ( compbuffer_size.value.y ) );
 
                 json_object_set_new( json_root, "max functors", json_integer( ISAAC_MAX_FUNCTORS ) );
                 json_t *json_functors_array = json_array();
@@ -631,15 +631,15 @@ class IsaacVisualization
             nx_s /= l;
             ny_s /= l;
             nz_s /= l;
-            clipping.elem[ nr ].position.x = px;
-            clipping.elem[ nr ].position.y = py;
-            clipping.elem[ nr ].position.z = pz;
-            clipping.elem[ nr ].normal.x = nx_s;
-            clipping.elem[ nr ].normal.y = ny_s;
-            clipping.elem[ nr ].normal.z = nz_s;
-            clipping_saved_normals[ nr ].x = nx;
-            clipping_saved_normals[ nr ].y = ny;
-            clipping_saved_normals[ nr ].z = nz;
+            clipping.elem[ nr ].position.value.x = px;
+            clipping.elem[ nr ].position.value.y = py;
+            clipping.elem[ nr ].position.value.z = pz;
+            clipping.elem[ nr ].normal.value.x = nx_s;
+            clipping.elem[ nr ].normal.value.y = ny_s;
+            clipping.elem[ nr ].normal.value.z = nz_s;
+            clipping_saved_normals[ nr ].value.x = nx;
+            clipping_saved_normals[ nr ].value.y = ny;
+            clipping_saved_normals[ nr ].value.z = nz;
             return true;
         }
         void addClipping(isaac_float px,isaac_float py,isaac_float pz,isaac_float nx,isaac_float ny,isaac_float nz)
@@ -701,7 +701,7 @@ class IsaacVisualization
         {
             ISAAC_WAIT_VISUALIZATION
             IsaacFunctorPool functors;
-            isaac_float4 isaac_parameter_h[boost::mpl::size< TSourceList >::type::value * ISAAC_MAX_FUNCTORS];
+            Vector<float,4> isaac_parameter_h[boost::mpl::size< TSourceList >::type::value * ISAAC_MAX_FUNCTORS];
             for (int i = 0; i < boost::mpl::size< TSourceList >::type::value; i++)
             {
                 functions[i].error_code = 0;
@@ -724,7 +724,7 @@ class IsaacVisualization
                     //search "(" and parse parameters
                     size_t t_begin = token.find("(");
                     if (t_begin == std::string::npos)
-                        memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(isaac_float4));
+                        memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(Vector<float,4>));
                     else
                     {
                         size_t t_end = token.find(")");
@@ -734,7 +734,7 @@ class IsaacVisualization
                             break;
                         }
                         if (t_end - t_begin == 1) //()
-                            memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(isaac_float4));
+                            memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(Vector<float,4>));
                         else
                         {
                             std::string parameters = token.substr(t_begin+1, t_end-t_begin-1);
@@ -774,7 +774,7 @@ class IsaacVisualization
                 for (;elem < ISAAC_MAX_FUNCTORS; elem++)
                 {
                     functions[i].bytecode[elem] = 0; //last one idem
-                    memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(isaac_float4));
+                    memset(&(isaac_parameter_h[i * ISAAC_MAX_FUNCTORS + elem]), 0, sizeof(Vector<float,4>));
                 }
             }
 
@@ -782,7 +782,7 @@ class IsaacVisualization
             dest_array_struct< boost::mpl::size< TSourceList >::type::value > dest;
             isaac_for_each_params( sources, update_functor_chain_iterator(), functions, dest);
             #if ISAAC_ALPAKA == 1
-                alpaka::mem::view::ViewPlainPtr<THost, isaac_float4, TFraDim, size_t> parameter_buffer(isaac_parameter_h, host, alpaka::Vec<TFraDim, size_t>::Vec(size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value)));
+                alpaka::mem::view::ViewPlainPtr<THost, Vector<float,4>, TFraDim, size_t> parameter_buffer(isaac_parameter_h, host, alpaka::Vec<TFraDim, size_t>::Vec(size_t(ISAAC_MAX_FUNCTORS * boost::mpl::size< TSourceList >::type::value)));
 
                 alpaka::Vec<alpaka::dim::DimInt<1u>, size_t> const parameter_d_extent(size_t(16));
                 auto parameter_d_view(alpaka::mem::view::createStaticDevMemView(&isaac_parameter_d[0u],acc,parameter_d_extent));
@@ -847,7 +847,7 @@ class IsaacVisualization
                 #if ISAAC_ALPAKA == 1
                     alpaka::mem::view::copy(stream, transfer_d_buf[i], transfer_h_buf[i], TTransfer_size );
                 #else
-                    ISAAC_CUDA_CHECK(cudaMemcpy(transfer_d.pointer[i], transfer_h.pointer[i], sizeof(isaac_float4)*TTransfer_size, cudaMemcpyHostToDevice));
+                    ISAAC_CUDA_CHECK(cudaMemcpy(transfer_d.pointer[i], transfer_h.pointer[i], sizeof(Vector<float,4>)*TTransfer_size, cudaMemcpyHostToDevice));
                 #endif
             }
         }
@@ -1126,7 +1126,7 @@ class IsaacVisualization
                     json_t *element;
                     json_array_foreach(value, index_2, element)
                     {
-                        transfer_h.description[index].insert( std::pair< isaac_uint, isaac_float4> (
+                        transfer_h.description[index].insert( std::pair< isaac_uint, Vector<float,4>> (
                             isaac_uint( json_number_value( json_object_get( element, "value" ) ) ), {
                                 isaac_float( json_number_value( json_object_get( element, "r" ) ) ),
                                 isaac_float( json_number_value( json_object_get( element, "g" ) ) ),
@@ -1434,7 +1434,7 @@ class IsaacVisualization
                 size_h[0].local_size_scaled.value.z = myself->local_size_scaled[2];
             size_h[0].max_global_size_scaled = static_cast<float>(ISAAC_MAX(ISAAC_MAX(uint32_t(myself->global_size_scaled[0]),uint32_t(myself->global_size_scaled[1])),uint32_t(myself->global_size_scaled[2])));
 
-            isaac_float3 isaac_scale =
+            Vector<float,3> isaac_scale =
             {
                 myself->scale[0],
                 myself->scale[1],
@@ -1455,14 +1455,14 @@ class IsaacVisualization
             #endif
             IceTUByte* pixels = icetImageGetColorub(result);
             ISAAC_START_TIME_MEASUREMENT( kernel, myself->getTicksUs() )
-            isaac_float4 bg_color =
+            Vector<float,4> bg_color =
             {
                 isaac_float(background_color[3]),
                 isaac_float(background_color[2]),
                 isaac_float(background_color[1]),
                 isaac_float(background_color[0])
             };
-            isaac_uint2 framebuffer_start =
+            Vector<uint32_t,2> framebuffer_start =
             {
                 isaac_uint( readback_viewport[0] ),
                 isaac_uint( readback_viewport[1] )
@@ -1478,7 +1478,7 @@ class IsaacVisualization
                     mpl::vector<>,
                     alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t>,
                     TTransfer_size,
-                    isaac_float3,
+                    Vector<float,3>,
                     TAccDim,
                     TAcc,
                     TStream,
@@ -1518,7 +1518,7 @@ class IsaacVisualization
                     mpl::vector<>,
                     uint32_t*,
                     TTransfer_size,
-                    isaac_float3,
+                    Vector<float,3>,
                     boost::mpl::size< TSourceList >::type::value
                 >
                 ::call(
@@ -1594,10 +1594,10 @@ class IsaacVisualization
                         {
                             json_t* color = json_array();
                             json_array_append_new( transfer, color );
-                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].x * isaac_float(255) ) ) );
-                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].y * isaac_float(255) ) ) );
-                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].z * isaac_float(255) ) ) );
-                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].w * isaac_float(255) ) ) );
+                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].value.x * isaac_float(255) ) ) );
+                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].value.y * isaac_float(255) ) ) );
+                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].value.z * isaac_float(255) ) ) );
+                            json_array_append_new( color, json_integer( isaac_uint( myself->transfer_h.pointer[i][j].value.w * isaac_float(255) ) ) );
                         }
                     }
                     json_object_set_new( myself->json_root, "transfer points", matrix = json_array() );
@@ -1610,10 +1610,10 @@ class IsaacVisualization
                             json_t* p = json_object();
                             json_array_append_new( points, p);
                             json_object_set_new(p, "value", json_integer( it->first ) );
-                            json_object_set_new(p, "r", json_real( it->second.x ) );
-                            json_object_set_new(p, "g", json_real( it->second.y ) );
-                            json_object_set_new(p, "b", json_real( it->second.z ) );
-                            json_object_set_new(p, "a", json_real( it->second.w ) );
+                            json_object_set_new(p, "r", json_real( it->second.value.x ) );
+                            json_object_set_new(p, "g", json_real( it->second.value.y ) );
+                            json_object_set_new(p, "b", json_real( it->second.value.z ) );
+                            json_object_set_new(p, "a", json_real( it->second.value.w ) );
                         }
                     }
                 }
@@ -1680,14 +1680,14 @@ class IsaacVisualization
                         json_array_append_new( matrix, f );
                         json_t* inner = json_array();
                         json_object_set_new(f, "position", inner );
-                        json_array_append_new( inner, json_real( myself->clipping.elem[i].position.x ) );
-                        json_array_append_new( inner, json_real( myself->clipping.elem[i].position.y ) );
-                        json_array_append_new( inner, json_real( myself->clipping.elem[i].position.z ) );
+                        json_array_append_new( inner, json_real( myself->clipping.elem[i].position.value.x ) );
+                        json_array_append_new( inner, json_real( myself->clipping.elem[i].position.value.y ) );
+                        json_array_append_new( inner, json_real( myself->clipping.elem[i].position.value.z ) );
                                 inner = json_array();
                         json_object_set_new(f, "normal", inner );
-                        json_array_append_new( inner, json_real( myself->clipping_saved_normals[i].x ) );
-                        json_array_append_new( inner, json_real( myself->clipping_saved_normals[i].y ) );
-                        json_array_append_new( inner, json_real( myself->clipping_saved_normals[i].z ) );
+                        json_array_append_new( inner, json_real( myself->clipping_saved_normals[i].value.x ) );
+                        json_array_append_new( inner, json_real( myself->clipping_saved_normals[i].value.y ) );
+                        json_array_append_new( inner, json_real( myself->clipping_saved_normals[i].value.z ) );
                     }
                 }
                 myself->controller.sendFeedback( myself->json_root, myself->send_controller );
@@ -1705,7 +1705,7 @@ class IsaacVisualization
             if (myself->communicator)
             {
                 if (myself->image[0].opaque_internals)
-                    myself->communicator->serverSendFrame(myself->compositor.doCompositing(myself->image),myself->compbuffer_size.x,myself->compbuffer_size.y,4);
+                    myself->communicator->serverSendFrame(myself->compositor.doCompositing(myself->image),myself->compbuffer_size.value.x,myself->compbuffer_size.value.y,4);
                 else
                 {
                     myself->communicator->serverSend(NULL,false,true);
@@ -1759,8 +1759,8 @@ class IsaacVisualization
         std::string name;
         std::string server_url;
         isaac_uint server_port;
-        isaac_size2 framebuffer_size;
-        isaac_size2 compbuffer_size;
+        Vector<size_t,2> framebuffer_size;
+        Vector<size_t,2> compbuffer_size;
         #if ISAAC_ALPAKA == 1
             alpaka::Vec<TFraDim, size_t> framebuffer_prod;
             alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, size_t> framebuffer;
@@ -1817,8 +1817,8 @@ class IsaacVisualization
         IsaacVisualizationMetaEnum thr_metaTargets;
         pthread_t visualizationThread;
         #if ISAAC_ALPAKA == 1
-            std::vector< alpaka::mem::buf::Buf<TDevAcc, isaac_float4, TTexDim, size_t> > transfer_d_buf;
-            std::vector< alpaka::mem::buf::Buf<  THost, isaac_float4, TTexDim, size_t> > transfer_h_buf;
+            std::vector< alpaka::mem::buf::Buf<TDevAcc, Vector<float,4>, TTexDim, size_t> > transfer_d_buf;
+            std::vector< alpaka::mem::buf::Buf<  THost, Vector<float,4>, TTexDim, size_t> > transfer_h_buf;
             std::vector< alpaka::mem::buf::Buf< TDevAcc, isaac_float, TFraDim, size_t> > pointer_array_alpaka;
         #endif
         transfer_d_struct< boost::mpl::size< TSourceList >::type::value > transfer_d;
@@ -1834,7 +1834,7 @@ class IsaacVisualization
         static IsaacVisualization *myself;
         TScale scale;
         clipping_struct clipping;
-        isaac_float3 clipping_saved_normals[ISAAC_MAX_CLIPPING];
+        Vector<float,3> clipping_saved_normals[ISAAC_MAX_CLIPPING];
         TController controller;
         TCompositor compositor;
         IceTImage image[TController::pass_count];

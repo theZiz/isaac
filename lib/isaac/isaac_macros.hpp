@@ -47,7 +47,7 @@
     start.x end
 
 #define ISAAC_FOR_EACH_DIM(dim,start,end) \
-    BOOST_PP_CAT( ISAAC_FOR_EACH_DIM_, dim) (start,end)
+    BOOST_PP_CAT( ISAAC_FOR_EACH_DIM_, dim) (start.value,end)
 
 #define ISAAC_FOR_EACH_DIM_TWICE_4(start,middle,end) \
     start.x middle.x end \
@@ -68,7 +68,7 @@
     start.x middle.x end
 
 #define ISAAC_FOR_EACH_DIM_TWICE(dim,start,middle,end) \
-    BOOST_PP_CAT( ISAAC_FOR_EACH_DIM_TWICE_, dim) (start,middle,end)
+    BOOST_PP_CAT( ISAAC_FOR_EACH_DIM_TWICE_, dim) (start.value,middle.value,end)
 
 #define ISAAC_SWITCH_IF_SMALLER(left,right) \
     if (left < right) \
@@ -80,12 +80,12 @@
 
 #define ISAAC_SET_COLOR( dest, color ) \
     { \
-        isaac_uint4 result; \
-        result.x = ISAAC_MIN( isaac_uint( ISAAC_MIN( isaac_float(1), color.x ) * 255.0f ), 255u); \
-        result.y = ISAAC_MIN( isaac_uint( ISAAC_MIN( isaac_float(1), color.y ) * 255.0f ), 255u); \
-        result.z = ISAAC_MIN( isaac_uint( ISAAC_MIN( isaac_float(1), color.z ) * 255.0f ), 255u); \
-        result.w = ISAAC_MIN( isaac_uint( ISAAC_MIN( isaac_float(1), color.w ) * 255.0f ), 255u); \
-        dest = (result.w << 24) | (result.z << 16) | (result.y << 8) | (result.x << 0); \
+        Vector<uint32_t,4> result; \
+        result.value.x = ISAAC_MIN( isaac_uint( ISAAC_MIN( isaac_float(1), color.value.x ) * 255.0f ), 255u); \
+        result.value.y = ISAAC_MIN( isaac_uint( ISAAC_MIN( isaac_float(1), color.value.y ) * 255.0f ), 255u); \
+        result.value.z = ISAAC_MIN( isaac_uint( ISAAC_MIN( isaac_float(1), color.value.z ) * 255.0f ), 255u); \
+        result.value.w = ISAAC_MIN( isaac_uint( ISAAC_MIN( isaac_float(1), color.value.w ) * 255.0f ), 255u); \
+        dest = (result.value.w << 24) | (result.value.z << 16) | (result.value.y << 8) | (result.value.x << 0); \
     }
 
 #define ISAAC_START_TIME_MEASUREMENT( unique_name, time_function ) \

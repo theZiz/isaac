@@ -31,179 +31,172 @@ typedef uint32_t isaac_uint;
 #define ISAAC_COMPONENTS_SEQ_1 (x)(y)
 #define ISAAC_COMPONENTS_SEQ_0 (x)
 
-#ifndef __CUDACC__
-    //isaac_float4, isaac_float3, isaac_float2
-    #define ISAAC_FLOAT_DEF(Z, I, unused) \
-        struct BOOST_PP_CAT(isaac_float, BOOST_PP_INC(I) ) \
-        { \
-            isaac_float BOOST_PP_SEQ_ENUM( BOOST_PP_CAT( ISAAC_COMPONENTS_SEQ_ , I ) ); \
-        };
-    BOOST_PP_REPEAT(4, ISAAC_FLOAT_DEF, ~)
-    #undef ISAAC_FLOAT_DEF
-    //isaac_uint4, isaac_uint3, isaac_uint2
-    #define ISAAC_UINT_DEF(Z, I, unused) \
-        struct BOOST_PP_CAT(isaac_uint, BOOST_PP_INC(I) ) \
-        { \
-            isaac_uint BOOST_PP_SEQ_ENUM( BOOST_PP_CAT( ISAAC_COMPONENTS_SEQ_ , I ) ); \
-        };
-    BOOST_PP_REPEAT(4, ISAAC_UINT_DEF, ~)
-    #undef ISAAC_UINT_DEF
-    //isaac_int4, isaac_int3, isaac_int2
-    #define ISAAC_INT_DEF(Z, I, unused) \
-        struct BOOST_PP_CAT(isaac_int, BOOST_PP_INC(I) ) \
-        { \
-            isaac_int BOOST_PP_SEQ_ENUM( BOOST_PP_CAT( ISAAC_COMPONENTS_SEQ_ , I ) ); \
-        };
-    BOOST_PP_REPEAT(4, ISAAC_INT_DEF, ~)
-    #undef ISAAC_INT_DEF
-#else
-    //same as above, but we use the builtin cuda variables
-    #define ISAAC_CUDA_DEF(Z, I, unused) \
-        typedef BOOST_PP_CAT(float, BOOST_PP_INC(I) ) BOOST_PP_CAT(isaac_float, BOOST_PP_INC(I) ); \
-        typedef BOOST_PP_CAT(uint, BOOST_PP_INC(I) ) BOOST_PP_CAT(isaac_uint, BOOST_PP_INC(I) ); \
-        typedef BOOST_PP_CAT(int, BOOST_PP_INC(I) ) BOOST_PP_CAT(isaac_int, BOOST_PP_INC(I) );
-    BOOST_PP_REPEAT(4, ISAAC_CUDA_DEF, ~)
-    #undef ISAAC_CUDA_DEF
+template <typename T,unsigned int d>
+union Vector
+{
+	struct
+	{
+		T x;
+		T y;
+		T z;
+		T w;
+	} value;
+	T direct[d];
+};
+
+//Specialization for 1…3 dimensional vectors with only (x), (x,y) or (x,y,z) in "vec".
+#define ISAAC_SPECIALIZATION_DEF(Z, I, unused) \
+	template <typename T> \
+	union Vector<T, BOOST_PP_INC(I) > \
+	{ \
+		struct \
+		{ \
+			T BOOST_PP_SEQ_ENUM( BOOST_PP_CAT( ISAAC_COMPONENTS_SEQ_ , I ) ); \
+		} value; \
+		T direct[ BOOST_PP_INC(I) ]; \
+	};
+BOOST_PP_REPEAT(3, ISAAC_SPECIALIZATION_DEF, ~)
+#undef ISAAC_SPECIALIZATION_DEF
+
+template <typename T>
+union Vector<T,0>
+{
+};
+
+#ifdef __CUDACC__
+	#define ISAAC_CUDA_DEF(Z, I, TYPE) \
+		template <> \
+		union Vector<TYPE,BOOST_PP_INC(I)> \
+		{ \
+			BOOST_PP_CAT(TYPE, BOOST_PP_INC(I) ) value; \
+			TYPE direct[ BOOST_PP_INC(I) ]; \
+		};
+	BOOST_PP_REPEAT(4, ISAAC_CUDA_DEF, int)
+	BOOST_PP_REPEAT(4, ISAAC_CUDA_DEF, float)
+	BOOST_PP_REPEAT(4, ISAAC_CUDA_DEF, uint)
+	#undef ISAAC_CUDA_DEF
 #endif
 
-//isaac_size4, isaac_size3, isaac_size2, isaac_size1
-#define ISAAC_SIZE_DEF(Z, I, unused) \
-    struct BOOST_PP_CAT(isaac_size, BOOST_PP_INC(I) ) \
+template <typename T,unsigned int d,int c>
+union VectorArray
+{
+	Vector<T,d> data[c];
+	T array[d*c];
+};
+
+#define ISAAC_UNARY_OPERATOR_OVERLOAD( OPERATOR ) \
+    /* Vector<T,d> OP Vector<T,d> */\
+    template <typename T,unsigned int d> \
+    const Vector<T,d> inline __host__ __device__ operator OPERATOR (Vector<T,d> const& lhs, Vector<T,d> const& rhs) \
     { \
-        size_t BOOST_PP_SEQ_ENUM( BOOST_PP_CAT( ISAAC_COMPONENTS_SEQ_ , I ) ); \
+        Vector<T,d> tmp(lhs); \
+        for (unsigned i = 0; i < d; i++) \
+            tmp.direct[i] = tmp.direct[i] OPERATOR rhs.direct[i]; \
+        return tmp; \
+    }; \
+    \
+    /* Vector<T,d> OP T */\
+    template <typename T,unsigned int d> \
+    const Vector<T,d> inline __host__ __device__ operator OPERATOR (Vector<T,d> const& lhs, T const& rhs) \
+    { \
+        Vector<T,d> tmp(lhs); \
+        for (unsigned i = 0; i < d; i++) \
+            tmp.direct[i] = tmp.direct[i] OPERATOR rhs; \
+        return tmp; \
+    }; \
+    \
+    /* T OP Vector<T,d> */\
+    template <typename T,unsigned int d> \
+    const Vector<T,d> inline __host__ __device__ operator OPERATOR (T const& lhs, Vector<T,d> const& rhs) \
+    { \
+        Vector<T,d> tmp(rhs); \
+        for (unsigned i = 0; i < d; i++) \
+            tmp.direct[i] = lhs OPERATOR tmp.direct[i]; \
+        return tmp; \
+    }; \
+    \
+    /* VectorArray<T,d,c> OP VectorArray<T,d,c> */\
+    template <typename T,unsigned int d,int c> \
+    const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (VectorArray<T,d,c> const& lhs, VectorArray<T,d,c> const& rhs) \
+    { \
+        VectorArray<T,d,c> tmp(lhs); \
+        for (unsigned i = 0; i < d*c; i++) \
+            tmp.array[i] = tmp.array[i] OPERATOR rhs.array[i]; \
+        return tmp; \
+    }; \
+    \
+    /* VectorArray<T,d,c> OP T */\
+    template <typename T,unsigned int d,int c> \
+    const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (VectorArray<T,d,c> const& lhs, T const& rhs) \
+    { \
+        VectorArray<T,d,c> tmp(lhs); \
+        for (unsigned i = 0; i < d*c; i++) \
+            tmp.array[i] = tmp.array[i] OPERATOR rhs; \
+        return tmp; \
+    }; \
+    \
+    /* T OP VectorArray<T,d,c> */\
+    template <typename T,unsigned int d,int c> \
+    const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (T const& lhs, VectorArray<T,d,c> const& rhs) \
+    { \
+        VectorArray<T,d,c> tmp(rhs); \
+        for (unsigned i = 0; i < d*c; i++) \
+            tmp.array[i] = lhs OPERATOR tmp.array[i]; \
+        return tmp; \
     };
-BOOST_PP_REPEAT(4, ISAAC_SIZE_DEF, ~)
-#undef ISAAC_SIZE_DEF
 
-//Overloading *, /, + and - for isaac_{type}[2,3,4]:
-//macro for result.<I> = left.<I> <OP[1]> right.<I>, with I € {x,y,z,w}
-#define ISAAC_OVERLOAD_OPERATOR_SUBDEF(Z, I, OP ) \
-    result. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) ) = \
-    left. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) ) BOOST_PP_ARRAY_ELEM( 1, OP ) \
-    right. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) );
+ISAAC_UNARY_OPERATOR_OVERLOAD(+)
+ISAAC_UNARY_OPERATOR_OVERLOAD(-)
+ISAAC_UNARY_OPERATOR_OVERLOAD(*)
+ISAAC_UNARY_OPERATOR_OVERLOAD(/)
 
-#define ISAAC_OVERLOAD_OPERATOR_SUBDEF_ROTHER(Z, I, OP ) \
-    result. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) ) = \
-    left. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) ) BOOST_PP_ARRAY_ELEM( 1, OP ) \
-    right;
+#undef ISAAC_UNARY_OPERATOR_OVERLOAD
 
-#define ISAAC_OVERLOAD_OPERATOR_SUBDEF_LOTHER(Z, I, OP ) \
-    result. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) ) = \
-    left  BOOST_PP_ARRAY_ELEM( 1, OP ) \
-    right. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) );
 
-#define ISAAC_OVERLOAD_OPERATOR_SUBDEF_UNARY(Z, I, OP ) \
-    result. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) ) = BOOST_PP_ARRAY_ELEM( 1, OP ) \
-    left. BOOST_PP_ARRAY_ELEM( I, BOOST_PP_SEQ_TO_ARRAY( ISAAC_COMPONENTS_SEQ_3 ) );
+/* - Vector<T,d>*/\
+template <typename T,unsigned int d>
+const Vector<T,d> inline __host__ __device__ operator - (Vector<T,d> const& lhs)
+{
+    Vector<T,d> tmp(lhs);
+    for (unsigned i = 0; i < d; i++)
+        tmp.direct[i] = - tmp.direct[i];
+    return tmp;
+};
 
-//macro for the any operator for isaac_{type}[2,3,4].
-#define ISAAC_OVERLOAD_OPERATOR_DEF(Z, I, OP) \
-    ISAAC_HOST_DEVICE_INLINE BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) operator BOOST_PP_ARRAY_ELEM( 1, OP ) ( \
-    const BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) & left, \
-    const BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) & right) \
-    { \
-        BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) result; \
-        BOOST_PP_REPEAT( BOOST_PP_INC(I), ISAAC_OVERLOAD_OPERATOR_SUBDEF, OP ) \
-        return result; \
-    } \
-    ISAAC_HOST_DEVICE_INLINE BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) operator BOOST_PP_ARRAY_ELEM( 1, OP ) ( \
-    const BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) & left, \
-    const isaac_float & right) \
-    { \
-        BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) result; \
-        BOOST_PP_REPEAT( BOOST_PP_INC(I), ISAAC_OVERLOAD_OPERATOR_SUBDEF_ROTHER, OP ) \
-        return result; \
-    } \
-    ISAAC_HOST_DEVICE_INLINE BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) operator BOOST_PP_ARRAY_ELEM( 1, OP ) ( \
-    const isaac_float & left, \
-    const BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) & right ) \
-    { \
-        BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) result; \
-        BOOST_PP_REPEAT( BOOST_PP_INC(I), ISAAC_OVERLOAD_OPERATOR_SUBDEF_LOTHER, OP ) \
-        return result; \
-    }
-
-#define ISAAC_OVERLOAD_OPERATOR_DEF_UNARY(Z, I, OP) \
-    ISAAC_HOST_DEVICE_INLINE BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) operator BOOST_PP_ARRAY_ELEM( 1, OP ) ( \
-    const BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) & left ) \
-    { \
-        BOOST_PP_CAT( BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( 0, OP ) ), BOOST_PP_INC(I) ) result; \
-        BOOST_PP_REPEAT( BOOST_PP_INC(I), ISAAC_OVERLOAD_OPERATOR_SUBDEF_UNARY, OP ) \
-        return result; \
-    }
-
-#define ISAAC_OVERLOAD_OPERATOR_COUNT 4
-#define ISAAC_OVERLOAD_OPERATORS (ISAAC_OVERLOAD_OPERATOR_COUNT, (+, -, *, / ) )
-
-#define ISAAC_OVERLOAD_ITERATOR(Z, I, TYPE) \
-    BOOST_PP_REPEAT( 4, ISAAC_OVERLOAD_OPERATOR_DEF, (2, (TYPE, BOOST_PP_ARRAY_ELEM( I, ISAAC_OVERLOAD_OPERATORS ) ) ) ) \
-
-#define ISAAC_OVERLOAD_OPERATOR_CREATE( TYPE ) \
-    BOOST_PP_REPEAT( ISAAC_OVERLOAD_OPERATOR_COUNT, ISAAC_OVERLOAD_ITERATOR, TYPE ) \
-    BOOST_PP_REPEAT( 4, ISAAC_OVERLOAD_OPERATOR_DEF_UNARY, (2, (TYPE, - ) ) )
-
-ISAAC_OVERLOAD_OPERATOR_CREATE(float)
-ISAAC_OVERLOAD_OPERATOR_CREATE(uint)
-ISAAC_OVERLOAD_OPERATOR_CREATE(int)
-ISAAC_OVERLOAD_OPERATOR_CREATE(size)
-
-#undef ISAAC_OVERLOAD_OPERATOR_SUBDEF_LOTHER
-#undef ISAAC_OVERLOAD_OPERATOR_SUBDEF_ROTHER
-#undef ISAAC_OVERLOAD_OPERATOR_COUNT
-#undef ISAAC_OVERLOAD_OPERATORS
-#undef ISAAC_OVERLOAD_ITERATOR
-#undef ISAAC_OVERLOAD_OPERATOR_SUBDEF
-#undef ISAAC_OVERLOAD_OPERATOR_SUBDEF_UNARY
-#undef ISAAC_OVERLOAD_OPERATOR_DEF
-#undef ISAAC_OVERLOAD_OPERATOR_DEF_UNARY
-#undef ISAAC_OVERLOAD_OPERATOR_CREATE
-
-#define ISAAC_DIM_TYPES ( 4, ( size, float, int, uint ) )
-#define ISAAC_DIM_TYPES_DIM ( 4, ( size_dim, float_dim, int_dim, uint_dim ) )
-
-#define ISAAC_DIM_SUBDEF(Z, J, I ) \
-    template <> \
-    struct BOOST_PP_CAT( isaac_, BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES_DIM ) ) \
-    < size_t( BOOST_PP_INC(J) ) > { \
-    BOOST_PP_CAT( isaac_, BOOST_PP_CAT( BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES ) , BOOST_PP_INC(J) ) ) value; };
-
-#define ISAAC_DIM_DEF(Z, I, unused) \
-    template < size_t > \
-    struct BOOST_PP_CAT( isaac_ , BOOST_PP_ARRAY_ELEM( I, ISAAC_DIM_TYPES_DIM ) ); \
-    BOOST_PP_REPEAT( 4, ISAAC_DIM_SUBDEF, I )
-
-BOOST_PP_REPEAT( 4, ISAAC_DIM_DEF, ~ )
-
-#undef ISAAC_DIM_SUBDEF
-#undef ISAAC_DIM_DEF
-#undef ISAAC_DIM_TYPES
-#undef ISAAC_DIM_TYPES_DIM
+/* - VectorArray<T,d,c> */\
+template <typename T,unsigned int d,int c>
+const VectorArray<T,d,c> inline __host__ __device__ operator - (VectorArray<T,d,c> const& lhs)
+{
+    VectorArray<T,d,c> tmp(lhs);
+    for (unsigned i = 0; i < d*c; i++)
+        tmp.array[i] = - tmp.array[i];
+    return tmp;
+};
 
 template < size_t simdim >
 struct isaac_size_struct
 {
-    isaac_size_dim < simdim > global_size;
+    Vector<size_t,simdim> global_size;
     size_t max_global_size;
-    isaac_size_dim < simdim > position;
-    isaac_size_dim < simdim > local_size;
-    isaac_size_dim < simdim > global_size_scaled;
+    Vector<size_t,simdim> position;
+    Vector<size_t,simdim> local_size;
+    Vector<size_t,simdim> global_size_scaled;
     size_t max_global_size_scaled;
-    isaac_size_dim < simdim > position_scaled;
-    isaac_size_dim < simdim > local_size_scaled;
+    Vector<size_t,simdim> position_scaled;
+    Vector<size_t,simdim> local_size_scaled;
 };
-
 
 template< int N >
 struct transfer_d_struct
 {
-    isaac_float4* pointer[ N ];
+    Vector<float,4>* pointer[ N ];
 };
 
 template< int N >
 struct transfer_h_struct
 {
-    isaac_float4* pointer[ N ];
-    std::map< isaac_uint, isaac_float4 > description[ N ];
+    Vector<float,4>* pointer[ N ];
+    std::map< isaac_uint, Vector<float,4> > description[ N ];
 };
 
 struct functions_struct
@@ -246,8 +239,8 @@ struct clipping_struct
     isaac_uint count;
     struct
     {
-        isaac_float3 position;
-        isaac_float3 normal;
+        Vector<float,3> position;
+        Vector<float,3> normal;
     } elem[ ISAAC_MAX_CLIPPING ];
 };
 

@@ -209,45 +209,45 @@ void calcInverse(IceTDouble* inv,const IceTDouble* projection,const IceTDouble* 
 		inv[i] = inv[i] * det;
 }
 
-isaac_float4 getHSVA(isaac_float h, isaac_float s, isaac_float v, isaac_float a)
+Vector<float,4> getHSVA(isaac_float h, isaac_float s, isaac_float v, isaac_float a)
 {
 	isaac_int hi = isaac_int(floor(h / (M_PI/3)));
 	isaac_float f = h / (M_PI/3) - isaac_float(hi);
 	isaac_float p = v*(isaac_float(1)-s);
 	isaac_float q = v*(isaac_float(1)-s*f);
 	isaac_float t = v*(isaac_float(1)-s*(isaac_float(1)-f));
-	isaac_float4 result = {0,0,0,a};
+	Vector<float,4> result = {0,0,0,a};
 	switch (hi)
 	{
 		case 0: case 6:
-			result.x = v;
-			result.y = t;
-			result.z = p;
+			result.value.x = v;
+			result.value.y = t;
+			result.value.z = p;
 			break;
 		case 1:
-			result.x = q;
-			result.y = v;
-			result.z = p;
+			result.value.x = q;
+			result.value.y = v;
+			result.value.z = p;
 			break;
 		case 2:
-			result.x = p;
-			result.y = v;
-			result.z = t;
+			result.value.x = p;
+			result.value.y = v;
+			result.value.z = t;
 			break;
 		case 3:
-			result.x = p;
-			result.y = q;
-			result.z = v;
+			result.value.x = p;
+			result.value.y = q;
+			result.value.z = v;
 			break;
 		case 4:
-			result.x = t;
-			result.y = p;
-			result.z = v;
+			result.value.x = t;
+			result.value.y = p;
+			result.value.z = v;
 			break;
 		case 5:
-			result.x = v;
-			result.y = p;
-			result.z = q;
+			result.value.x = v;
+			result.value.y = p;
+			result.value.z = q;
 			break;
 	}
 	return result;

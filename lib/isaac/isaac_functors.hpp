@@ -47,22 +47,22 @@ struct IsaacFunctorIdem
     static const std::string name;
     static const std::string description;
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<4> call( const isaac_float_dim<4> v, const isaac_float4& p)
+    static Vector<float,4> call( const Vector<float,4> v, const Vector<float,4>& p)
     {
         return v;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<3> call( const isaac_float_dim<3> v, const isaac_float4& p)
+    static Vector<float,3> call( const Vector<float,3> v, const Vector<float,4>& p)
     {
         return v;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<2> call( const isaac_float_dim<2> v, const isaac_float4& p)
+    static Vector<float,2> call( const Vector<float,2> v, const Vector<float,4>& p)
     {
         return v;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<1> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,1> v, const Vector<float,4>& p)
     {
         return v;
     }
@@ -85,9 +85,9 @@ struct IsaacFunctorLength
     static const std::string name;
     static const std::string description;
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<4> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,4> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result =
+        Vector<float,1> result =
         {
             sqrt(
             v.value.x * v.value.x +
@@ -99,9 +99,9 @@ struct IsaacFunctorLength
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<3> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,3> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result =
+        Vector<float,1> result =
         {
             sqrt(
             v.value.x * v.value.x +
@@ -112,9 +112,9 @@ struct IsaacFunctorLength
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<2> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,2> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result =
+        Vector<float,1> result =
         {
             sqrt(
             v.value.x * v.value.x +
@@ -124,9 +124,9 @@ struct IsaacFunctorLength
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<1> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,1> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result = { fabs( v.value.x ) };
+        Vector<float,1> result = { fabs( v.value.x ) };
         return result;
     }
     ISAAC_HOST_INLINE
@@ -149,36 +149,36 @@ struct IsaacFunctorMul
     static const std::string name;
     static const std::string description;
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<4> call( const isaac_float_dim<4> v, const isaac_float4& p)
+    static Vector<float,4> call( const Vector<float,4> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<4> result = { v.value * p };
+        Vector<float,4> result = v * p;
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<3> call( const isaac_float_dim<3> v, const isaac_float4& p)
+    static Vector<float,3> call( const Vector<float,3> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<3> result =
+        Vector<float,3> result =
         {
-            v.value.x * p.x,
-            v.value.y * p.y,
-            v.value.z * p.z
+            v.value.x * p.value.x,
+            v.value.y * p.value.y,
+            v.value.z * p.value.z
         };
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<2> call( const isaac_float_dim<2> v, const isaac_float4& p)
+    static Vector<float,2> call( const Vector<float,2> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<2> result =
+        Vector<float,2> result =
         {
-            v.value.x * p.x,
-            v.value.y * p.y
+            v.value.x * p.value.x,
+            v.value.y * p.value.y
         };
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<1> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,1> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result = { v.value.x * p.x };
+        Vector<float,1> result = { v.value.x * p.value.x };
         return result;
     }
     ISAAC_HOST_INLINE
@@ -201,36 +201,36 @@ struct IsaacFunctorAdd
     static const std::string name;
     static const std::string description;
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<4> call( const isaac_float_dim<4> v, const isaac_float4& p)
+    static Vector<float,4> call( const Vector<float,4> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<4> result = { v.value + p };
+        Vector<float,4> result = v + p;
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<3> call( const isaac_float_dim<3> v, const isaac_float4& p)
+    static Vector<float,3> call( const Vector<float,3> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<3> result =
+        Vector<float,3> result =
         {
-            v.value.x + p.x,
-            v.value.y + p.y,
-            v.value.z + p.z
+            v.value.x + p.value.x,
+            v.value.y + p.value.y,
+            v.value.z + p.value.z
         };
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<2> call( const isaac_float_dim<2> v, const isaac_float4& p)
+    static Vector<float,2> call( const Vector<float,2> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<2> result =
+        Vector<float,2> result =
         {
-            v.value.x + p.x,
-            v.value.y + p.y
+            v.value.x + p.value.x,
+            v.value.y + p.value.y
         };
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<1> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,1> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result = { v.value.x + p.x };
+        Vector<float,1> result = { v.value.x + p.value.x };
         return result;
     }
     ISAAC_HOST_INLINE
@@ -253,42 +253,42 @@ struct IsaacFunctorPow
     static const std::string name;
     static const std::string description;
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<4> call( const isaac_float_dim<4> v, const isaac_float4& p)
+    static Vector<float,4> call( const Vector<float,4> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<4> result =
+        Vector<float,4> result =
         {
-            pow( v.value.x, p.x ),
-            pow( v.value.y, p.y ),
-            pow( v.value.z, p.z ),
-            pow( v.value.w, p.w )
+            pow( v.value.x, p.value.x ),
+            pow( v.value.y, p.value.y ),
+            pow( v.value.z, p.value.z ),
+            pow( v.value.w, p.value.w )
         };
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<3> call( const isaac_float_dim<3> v, const isaac_float4& p)
+    static Vector<float,3> call( const Vector<float,3> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<3> result =
+        Vector<float,3> result =
         {
-            pow( v.value.x, p.x ),
-            pow( v.value.y, p.y ),
-            pow( v.value.z, p.z )
+            pow( v.value.x, p.value.x ),
+            pow( v.value.y, p.value.y ),
+            pow( v.value.z, p.value.z )
         };
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<2> call( const isaac_float_dim<2> v, const isaac_float4& p)
+    static Vector<float,2> call( const Vector<float,2> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<2> result =
+        Vector<float,2> result =
         {
-            pow( v.value.x, p.x ),
-            pow( v.value.y, p.y )
+            pow( v.value.x, p.value.x ),
+            pow( v.value.y, p.value.y )
         };
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<1> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,1> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result = { pow( v.value.x, p.x ) };
+        Vector<float,1> result = { pow( v.value.x, p.value.x ) };
         return result;
     }
     ISAAC_HOST_INLINE
@@ -311,9 +311,9 @@ struct IsaacFunctorSum
     static const std::string name;
     static const std::string description;
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<4> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,4> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result =
+        Vector<float,1> result =
         {
             v.value.x +
             v.value.y +
@@ -323,9 +323,9 @@ struct IsaacFunctorSum
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<3> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,3> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result =
+        Vector<float,1> result =
         {
             v.value.x +
             v.value.y +
@@ -334,9 +334,9 @@ struct IsaacFunctorSum
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<2> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,2> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result =
+        Vector<float,1> result =
         {
             v.value.x +
             v.value.y
@@ -344,9 +344,9 @@ struct IsaacFunctorSum
         return result;
     }
     ISAAC_HOST_DEVICE_INLINE
-    static isaac_float_dim<1> call( const isaac_float_dim<1> v, const isaac_float4& p)
+    static Vector<float,1> call( const Vector<float,1> v, const Vector<float,4>& p)
     {
-        isaac_float_dim<1> result = { v.value.x };
+        Vector<float,1> result = { v.value.x };
         return result;
     }
     ISAAC_HOST_INLINE

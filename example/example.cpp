@@ -44,7 +44,7 @@ class TestSource1
                 THost host,
                 TStream stream,
             #endif
-            isaac_float3* ptr
+            Vector<float,feature_dim>* ptr
         ) :
 		ptr(ptr)
 		{}
@@ -56,19 +56,17 @@ class TestSource1
 
 		ISAAC_HOST_INLINE void update(bool enabled, void* pointer) {}
 
-		isaac_float3* ptr;
+		Vector<float,feature_dim>* ptr;
 
 		ISAAC_NO_HOST_DEVICE_WARNING
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim< feature_dim > operator[] (const isaac_int3& nIndex) const
+		ISAAC_HOST_DEVICE_INLINE Vector<float, feature_dim > operator[] (const Vector<int,3>& nIndex) const
 		{
-			isaac_float3 value = ptr[
-				nIndex.x +
-				nIndex.y * VOLUME_X +
-				nIndex.z * VOLUME_X * VOLUME_Y
+			Vector<float,feature_dim> value = ptr[
+				nIndex.value.x +
+				nIndex.value.y * VOLUME_X +
+				nIndex.value.z * VOLUME_X * VOLUME_Y
 			];
-			isaac_float_dim<3> result;
-			result.value = value;
-			return result;
+			return value;
 		}
 };
 
@@ -108,14 +106,14 @@ class TestSource2
 		isaac_float* ptr;
 
 		ISAAC_NO_HOST_DEVICE_WARNING
-		ISAAC_HOST_DEVICE_INLINE isaac_float_dim< feature_dim > operator[] (const isaac_int3& nIndex) const
+		ISAAC_HOST_DEVICE_INLINE Vector<float, feature_dim > operator[] (const Vector<int,3>& nIndex) const
 		{
 			isaac_float value = ptr[
-				nIndex.x +
-				nIndex.y * VOLUME_X +
-				nIndex.z * VOLUME_X * VOLUME_Y
+				nIndex.value.x +
+				nIndex.value.y * VOLUME_X +
+				nIndex.value.z * VOLUME_X * VOLUME_Y
 			];
-			isaac_float_dim<1> result;
+			Vector<float,feature_dim> result;
 			result.value.x = value;
 			return result;
 		}
@@ -165,7 +163,7 @@ int main(int argc, char **argv)
 	printf("Using name %s\n",name);
 
 	//This defines the size of the generated rendering
-	isaac_size2 framebuffer_size =
+	Vector<size_t,2> framebuffer_size =
 	{
 		size_t(800),
 		size_t(600)
@@ -248,7 +246,7 @@ int main(int argc, char **argv)
 			devAcc,
 			devHost,
 			stream,
-			reinterpret_cast<isaac_float3*>(alpaka::mem::view::getPtrNative(deviceBuffer1))
+			reinterpret_cast<Vector<float,3>*>(alpaka::mem::view::getPtrNative(deviceBuffer1))
 		);
 		TestSource2 < DevAcc, DevHost, Stream > testSource2 (
 			devAcc,
@@ -262,7 +260,7 @@ int main(int argc, char **argv)
 			TestSource2< DevAcc, DevHost, Stream >
 		>;
 	#else //CUDA
-		TestSource1 testSource1 ( reinterpret_cast<isaac_float3*>(deviceBuffer1) );
+		TestSource1 testSource1 ( reinterpret_cast<Vector<float,3>*>(deviceBuffer1) );
 		TestSource2 testSource2 ( reinterpret_cast<isaac_float*>(deviceBuffer2) );
 		using SourceList = boost::fusion::list
 		<
