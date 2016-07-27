@@ -32,26 +32,8 @@ typedef uint32_t isaac_uint;
 #define ISAAC_COMPONENTS_SEQ_0 (x)
 
 #define ISAAC_VECTOR_ASSIGMENT( LEFT_TYPE, RIGHT_TYPE, ACCESS, RANGE) \
-/*    / LEFT_TYPE() / \
-    inline __host__ __device__ LEFT_TYPE () = default; \
-    / LEFT_TYPE(RIGHT_TYPE) / \
-    inline __host__ __device__ LEFT_TYPE (RIGHT_TYPE const& lhs) \
-    { \
-        for (unsigned i = 0; i < RANGE; i++) \
-            this->ACCESS[i] = lhs; \
-    } \
-    / LEFT_TYPE(std::initializer_list<LEFT_TYPE>) / \
-    inline __host__ __device__ LEFT_TYPE (std::initializer_list<LEFT_TYPE> const& lhs) \
-    { \
-        std::initializer_list<LEFT_TYPE>::iterator it = lhs.begin(); \
-        for (unsigned i = 0; i < RANGE; i++) \
-        { \
-            this->ACCESS[i] = *it; \
-            ++it; \
-        } \
-    } */\
     /* LEFT_TYPE = RIGHT_TYPE */ \
-    LEFT_TYPE inline __host__ __device__ operator = (RIGHT_TYPE const& lhs) \
+    LEFT_TYPE ISAAC_HOST_DEVICE_INLINE operator = (RIGHT_TYPE const& lhs) \
     { \
         for (unsigned i = 0; i < RANGE; i++) \
             this->ACCESS[i] = lhs; \
@@ -118,7 +100,7 @@ union VectorArray
 #define ISAAC_BINARY_OPERATOR_OVERLOAD( OPERATOR ) \
     /* Vector<T,d> OP Vector<T,d> */\
     template <typename T,unsigned int d> \
-    const Vector<T,d> inline __host__ __device__ operator OPERATOR (Vector<T,d> const& lhs, Vector<T,d> const& rhs) \
+    const Vector<T,d> ISAAC_HOST_DEVICE_INLINE operator OPERATOR (Vector<T,d> const& lhs, Vector<T,d> const& rhs) \
     { \
         Vector<T,d> tmp(lhs); \
         for (unsigned i = 0; i < d; i++) \
@@ -128,7 +110,7 @@ union VectorArray
     \
     /* Vector<T,d> OP T */\
     template <typename T,unsigned int d> \
-    const Vector<T,d> inline __host__ __device__ operator OPERATOR (Vector<T,d> const& lhs, T const& rhs) \
+    const Vector<T,d> ISAAC_HOST_DEVICE_INLINE operator OPERATOR (Vector<T,d> const& lhs, T const& rhs) \
     { \
         Vector<T,d> tmp(lhs); \
         for (unsigned i = 0; i < d; i++) \
@@ -138,7 +120,7 @@ union VectorArray
     \
     /* T OP Vector<T,d> */\
     template <typename T,unsigned int d> \
-    const Vector<T,d> inline __host__ __device__ operator OPERATOR (T const& lhs, Vector<T,d> const& rhs) \
+    const Vector<T,d> ISAAC_HOST_DEVICE_INLINE operator OPERATOR (T const& lhs, Vector<T,d> const& rhs) \
     { \
         Vector<T,d> tmp(rhs); \
         for (unsigned i = 0; i < d; i++) \
@@ -148,7 +130,7 @@ union VectorArray
     \
     /* VectorArray<T,d,c> OP VectorArray<T,d,c> */\
     template <typename T,unsigned int d,int c> \
-    const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (VectorArray<T,d,c> const& lhs, VectorArray<T,d,c> const& rhs) \
+    const VectorArray<T,d,c> ISAAC_HOST_DEVICE_INLINE operator OPERATOR (VectorArray<T,d,c> const& lhs, VectorArray<T,d,c> const& rhs) \
     { \
         VectorArray<T,d,c> tmp(lhs); \
         for (unsigned i = 0; i < d*c; i++) \
@@ -158,7 +140,7 @@ union VectorArray
     \
     /* VectorArray<T,d,c> OP Vector<T,d> */\
     template <typename T,unsigned int d,int c> \
-    const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (VectorArray<T,d,c> const& lhs, Vector<T,d> const& rhs) \
+    const VectorArray<T,d,c> ISAAC_HOST_DEVICE_INLINE operator OPERATOR (VectorArray<T,d,c> const& lhs, Vector<T,d> const& rhs) \
     { \
         VectorArray<T,d,c> tmp(lhs); \
         for (unsigned i = 0; i < c; i++) \
@@ -168,7 +150,7 @@ union VectorArray
     \
     /* VectorArray<T,d,c> OP VectorArray<T,1,c> */\
     template <typename T,unsigned int d,int c> \
-    const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (VectorArray<T,d,c> const& lhs, VectorArray<T,1,c> const& rhs) \
+    const VectorArray<T,d,c> ISAAC_HOST_DEVICE_INLINE operator OPERATOR (VectorArray<T,d,c> const& lhs, VectorArray<T,1,c> const& rhs) \
     { \
         VectorArray<T,d,c> tmp(lhs); \
         for (unsigned i = 0; i < c; i++) \
@@ -178,7 +160,7 @@ union VectorArray
     \
     /* VectorArray<T,d,c> OP T */\
     template <typename T,unsigned int d,int c> \
-    const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (VectorArray<T,d,c> const& lhs, T const& rhs) \
+    const VectorArray<T,d,c> ISAAC_HOST_DEVICE_INLINE operator OPERATOR (VectorArray<T,d,c> const& lhs, T const& rhs) \
     { \
         VectorArray<T,d,c> tmp(lhs); \
         for (unsigned i = 0; i < d*c; i++) \
@@ -188,7 +170,7 @@ union VectorArray
     \
     /* T OP VectorArray<T,d,c> */\
     template <typename T,unsigned int d,int c> \
-    const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (T const& lhs, VectorArray<T,d,c> const& rhs) \
+    const VectorArray<T,d,c> ISAAC_HOST_DEVICE_INLINE operator OPERATOR (T const& lhs, VectorArray<T,d,c> const& rhs) \
     { \
         VectorArray<T,d,c> tmp(rhs); \
         for (unsigned i = 0; i < d*c; i++) \
@@ -206,7 +188,7 @@ ISAAC_BINARY_OPERATOR_OVERLOAD(/)
 
 /* - Vector<T,d>*/\
 template <typename T,unsigned int d>
-const Vector<T,d> inline __host__ __device__ operator - (Vector<T,d> const& lhs)
+const Vector<T,d> ISAAC_HOST_DEVICE_INLINE operator - (Vector<T,d> const& lhs)
 {
     Vector<T,d> tmp(lhs);
     for (unsigned i = 0; i < d; i++)
@@ -216,7 +198,7 @@ const Vector<T,d> inline __host__ __device__ operator - (Vector<T,d> const& lhs)
 
 /* - VectorArray<T,d,c> */\
 template <typename T,unsigned int d,int c>
-const VectorArray<T,d,c> inline __host__ __device__ operator - (VectorArray<T,d,c> const& lhs)
+const VectorArray<T,d,c> ISAAC_HOST_DEVICE_INLINE operator - (VectorArray<T,d,c> const& lhs)
 {
     VectorArray<T,d,c> tmp(lhs);
     for (unsigned i = 0; i < d*c; i++)
