@@ -31,6 +31,33 @@ typedef uint32_t isaac_uint;
 #define ISAAC_COMPONENTS_SEQ_1 (x)(y)
 #define ISAAC_COMPONENTS_SEQ_0 (x)
 
+#define ISAAC_VECTOR_ASSIGMENT( LEFT_TYPE, RIGHT_TYPE, ACCESS, RANGE) \
+/*    / LEFT_TYPE() / \
+    inline __host__ __device__ LEFT_TYPE () = default; \
+    / LEFT_TYPE(RIGHT_TYPE) / \
+    inline __host__ __device__ LEFT_TYPE (RIGHT_TYPE const& lhs) \
+    { \
+        for (unsigned i = 0; i < RANGE; i++) \
+            this->ACCESS[i] = lhs; \
+    } \
+    / LEFT_TYPE(std::initializer_list<LEFT_TYPE>) / \
+    inline __host__ __device__ LEFT_TYPE (std::initializer_list<LEFT_TYPE> const& lhs) \
+    { \
+        std::initializer_list<LEFT_TYPE>::iterator it = lhs.begin(); \
+        for (unsigned i = 0; i < RANGE; i++) \
+        { \
+            this->ACCESS[i] = *it; \
+            ++it; \
+        } \
+    } */\
+    /* LEFT_TYPE = RIGHT_TYPE */ \
+    LEFT_TYPE inline __host__ __device__ operator = (RIGHT_TYPE const& lhs) \
+    { \
+        for (unsigned i = 0; i < RANGE; i++) \
+            this->ACCESS[i] = lhs; \
+        return *this; \
+    }
+
 template <typename T,unsigned int d>
 union Vector
 {
@@ -42,6 +69,7 @@ union Vector
 		T w;
 	} value;
 	T direct[d];
+    ISAAC_VECTOR_ASSIGMENT(Vector<T BOOST_PP_COMMA() d>,T,direct,d)
 };
 
 //Specialization for 1…3 dimensional vectors with only (x), (x,y) or (x,y,z) in "vec".
@@ -54,6 +82,7 @@ union Vector
 			T BOOST_PP_SEQ_ENUM( BOOST_PP_CAT( ISAAC_COMPONENTS_SEQ_ , I ) ); \
 		} value; \
 		T direct[ BOOST_PP_INC(I) ]; \
+        ISAAC_VECTOR_ASSIGMENT(Vector<T BOOST_PP_COMMA() BOOST_PP_INC(I)>,T,direct,BOOST_PP_INC(I)) \
 	};
 BOOST_PP_REPEAT(3, ISAAC_SPECIALIZATION_DEF, ~)
 #undef ISAAC_SPECIALIZATION_DEF
@@ -70,6 +99,7 @@ union Vector<T,0>
 		{ \
 			BOOST_PP_CAT(TYPE, BOOST_PP_INC(I) ) value; \
 			TYPE direct[ BOOST_PP_INC(I) ]; \
+            ISAAC_VECTOR_ASSIGMENT(Vector<TYPE BOOST_PP_COMMA() BOOST_PP_INC(I)>,TYPE,direct,BOOST_PP_INC(I)) \
 		};
 	BOOST_PP_REPEAT(4, ISAAC_CUDA_DEF, int)
 	BOOST_PP_REPEAT(4, ISAAC_CUDA_DEF, float)
@@ -82,9 +112,10 @@ union VectorArray
 {
 	Vector<T,d> data[c];
 	T array[d*c];
+    ISAAC_VECTOR_ASSIGMENT(VectorArray<T BOOST_PP_COMMA() d BOOST_PP_COMMA() c>,Vector<T BOOST_PP_COMMA() d>,data,c)
 };
 
-#define ISAAC_UNARY_OPERATOR_OVERLOAD( OPERATOR ) \
+#define ISAAC_BINARY_OPERATOR_OVERLOAD( OPERATOR ) \
     /* Vector<T,d> OP Vector<T,d> */\
     template <typename T,unsigned int d> \
     const Vector<T,d> inline __host__ __device__ operator OPERATOR (Vector<T,d> const& lhs, Vector<T,d> const& rhs) \
@@ -125,6 +156,26 @@ union VectorArray
         return tmp; \
     }; \
     \
+    /* VectorArray<T,d,c> OP Vector<T,d> */\
+    template <typename T,unsigned int d,int c> \
+    const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (VectorArray<T,d,c> const& lhs, Vector<T,d> const& rhs) \
+    { \
+        VectorArray<T,d,c> tmp(lhs); \
+        for (unsigned i = 0; i < c; i++) \
+            tmp.data[i] = tmp.data[i] OPERATOR rhs; \
+        return tmp; \
+    }; \
+    \
+    /* VectorArray<T,d,c> OP VectorArray<T,1,c> */\
+    template <typename T,unsigned int d,int c> \
+    const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (VectorArray<T,d,c> const& lhs, VectorArray<T,1,c> const& rhs) \
+    { \
+        VectorArray<T,d,c> tmp(lhs); \
+        for (unsigned i = 0; i < c; i++) \
+            tmp.data[i] = tmp.data[i] OPERATOR rhs.array[i]; \
+        return tmp; \
+    }; \
+    \
     /* VectorArray<T,d,c> OP T */\
     template <typename T,unsigned int d,int c> \
     const VectorArray<T,d,c> inline __host__ __device__ operator OPERATOR (VectorArray<T,d,c> const& lhs, T const& rhs) \
@@ -145,12 +196,12 @@ union VectorArray
         return tmp; \
     };
 
-ISAAC_UNARY_OPERATOR_OVERLOAD(+)
-ISAAC_UNARY_OPERATOR_OVERLOAD(-)
-ISAAC_UNARY_OPERATOR_OVERLOAD(*)
-ISAAC_UNARY_OPERATOR_OVERLOAD(/)
+ISAAC_BINARY_OPERATOR_OVERLOAD(+)
+ISAAC_BINARY_OPERATOR_OVERLOAD(-)
+ISAAC_BINARY_OPERATOR_OVERLOAD(*)
+ISAAC_BINARY_OPERATOR_OVERLOAD(/)
 
-#undef ISAAC_UNARY_OPERATOR_OVERLOAD
+#undef ISAAC_BINARY_OPERATOR_OVERLOAD
 
 
 /* - Vector<T,d>*/\
@@ -172,6 +223,7 @@ const VectorArray<T,d,c> inline __host__ __device__ operator - (VectorArray<T,d,
         tmp.array[i] = - tmp.array[i];
     return tmp;
 };
+
 
 template < size_t simdim >
 struct isaac_size_struct

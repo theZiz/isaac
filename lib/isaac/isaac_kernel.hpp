@@ -157,92 +157,124 @@ struct FillFunctorChainPointerKernelStruct
 template <
     isaac_int TInterpolation,
     typename NR,
+    unsigned int isaac_vector_elem,
     typename TSource,
     typename TPos,
     typename TPointerArray,
     typename TLocalSize,
-    typename TScale
+    typename TScale,
+    typename TLoopFinish
 >
-ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
+ISAAC_HOST_DEVICE_INLINE VectorArray<isaac_float,1,isaac_vector_elem> get_value (
     const TSource& source,
-    const TPos& pos,
+    const TPos& pos, //array
     const TPointerArray& pointerArray,
     const TLocalSize& local_size,
-    const TScale& scale
+    const TScale& scale,
+    const TLoopFinish& loop_finish //array
 )
 {
-    Vector<float, TSource::feature_dim > data;
-    Vector<float, TSource::feature_dim >* ptr = (Vector<float, TSource::feature_dim >*)(pointerArray.pointer[ NR::value ] );
+    VectorArray<isaac_float, TSource::feature_dim, isaac_vector_elem > data;
+    Vector<isaac_float, TSource::feature_dim >* ptr = (Vector<isaac_float, TSource::feature_dim >*)(pointerArray.pointer[ NR::value ] );
+    VectorArray<isaac_float,1,isaac_vector_elem> result;
+    VectorArray<isaac_int,3,isaac_vector_elem> coord;
     if (TInterpolation == 0)
     {
-        Vector<int,3> coord =
-        {
-            isaac_int(pos.value.x),
-            isaac_int(pos.value.y),
-            isaac_int(pos.value.z)
-        };
+        ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+            coord.data[e].value =
+            {
+                isaac_int(pos.data[e].value.x),
+                isaac_int(pos.data[e].value.y),
+                isaac_int(pos.data[e].value.z)
+            };
         if (TSource::persistent)
-            data = source[coord];
+        {
+            ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                if (!loop_finish.array[e])
+                    data.data[e] = source[coord.data[e]];
+        }
         else
-            data = ptr[coord.value.x + ISAAC_GUARD_SIZE + (coord.value.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.value.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
+            ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                if (!loop_finish.array[e])
+                    data.data[e] = ptr[coord.data[e].value.x + ISAAC_GUARD_SIZE + (coord.data[e].value.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.data[e].value.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
     }
     else
     {
-        Vector<int,3> coord;
-        Vector<float, TSource::feature_dim > data8[2][2][2];
+        VectorArray<float, TSource::feature_dim, isaac_vector_elem > data8[2][2][2];
         for (int x = 0; x < 2; x++)
             for (int y = 0; y < 2; y++)
                 for (int z = 0; z < 2; z++)
                 {
-                    coord.value.x = isaac_int(x?ceil(pos.value.x):floor(pos.value.x));
-                    coord.value.y = isaac_int(y?ceil(pos.value.y):floor(pos.value.y));
-                    coord.value.z = isaac_int(z?ceil(pos.value.z):floor(pos.value.z));
+                    ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                        coord.data[e].value.x = isaac_int(x?ceil(pos.data[e].value.x):floor(pos.data[e].value.x));
+                    ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                        coord.data[e].value.y = isaac_int(y?ceil(pos.data[e].value.y):floor(pos.data[e].value.y));
+                    ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                        coord.data[e].value.z = isaac_int(z?ceil(pos.data[e].value.z):floor(pos.data[e].value.z));
                     if (!TSource::has_guard && TSource::persistent)
                     {
-                        if ( isaac_uint(coord.value.x) >= local_size.value.x )
-                            coord.value.x = isaac_int(x?floor(pos.value.x):ceil(pos.value.x));
-                        if ( isaac_uint(coord.value.y) >= local_size.value.y )
-                            coord.value.y = isaac_int(y?floor(pos.value.y):ceil(pos.value.y));
-                        if ( isaac_uint(coord.value.z) >= local_size.value.z )
-                            coord.value.z = isaac_int(z?floor(pos.value.z):ceil(pos.value.z));
+                        ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                            if ( isaac_uint(coord.data[e].value.x) >= local_size.value.x )
+                                coord.data[e].value.x = isaac_int(x?floor(pos.data[e].value.x):ceil(pos.data[e].value.x));
+                        ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                            if ( isaac_uint(coord.data[e].value.y) >= local_size.value.y )
+                                coord.data[e].value.y = isaac_int(y?floor(pos.data[e].value.y):ceil(pos.data[e].value.y));
+                        ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                            if ( isaac_uint(coord.data[e].value.z) >= local_size.value.z )
+                                coord.data[e].value.z = isaac_int(z?floor(pos.data[e].value.z):ceil(pos.data[e].value.z));
                     }
                     if (TSource::persistent)
-                        data8[x][y][z] = source[coord];
+                    {
+                        ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                            if (!loop_finish.array[e])
+                                data8[x][y][z].data[e] = source[coord.data[e]];
+                    }
                     else
-                        data8[x][y][z] = ptr[coord.value.x + ISAAC_GUARD_SIZE + (coord.value.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.value.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
+                        ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                            if (!loop_finish.array[e])
+                                data8[x][y][z].data[e] = ptr[coord.data[e].value.x + ISAAC_GUARD_SIZE + (coord.data[e].value.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.data[e].value.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
                 }
-        Vector<float, 3 > pos_in_cube =
-        {
-            pos.value.x - floor(pos.value.x),
-            pos.value.y - floor(pos.value.y),
-            pos.value.z - floor(pos.value.z)
-        };
-        Vector<float, TSource::feature_dim > data4[2][2];
+        VectorArray<float, 3, isaac_vector_elem > pos_in_cube;
+        ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+            pos_in_cube.data[e].value =
+            {
+                pos.data[e].value.x - floor(pos.data[e].value.x),
+                pos.data[e].value.y - floor(pos.data[e].value.y),
+                pos.data[e].value.z - floor(pos.data[e].value.z)
+            };
+        VectorArray<float, TSource::feature_dim, isaac_vector_elem > data4[2][2];
         for (int x = 0; x < 2; x++)
             for (int y = 0; y < 2; y++)
-                data4[x][y] =
-                    data8[x][y][0] * (isaac_float(1) - pos_in_cube.value.z) +
-                    data8[x][y][1] * (                 pos_in_cube.value.z);
-        Vector<float, TSource::feature_dim > data2[2];
+                ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                    data4[x][y].data[e] =
+                        data8[x][y][0].data[e] * (isaac_float(1) - pos_in_cube.data[e].value.z) +
+                        data8[x][y][1].data[e] * (                 pos_in_cube.data[e].value.z);
+        VectorArray<float, TSource::feature_dim,isaac_vector_elem > data2[2];
         for (int x = 0; x < 2; x++)
-            data2[x] =
-                data4[x][0] * (isaac_float(1) - pos_in_cube.value.y) +
-                data4[x][1] * (                 pos_in_cube.value.y);
-        data =
-            data2[0] * (isaac_float(1) - pos_in_cube.value.x) +
-            data2[1] * (                 pos_in_cube.value.x);
+            ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                data2[x].data[e] =
+                    data4[x][0].data[e] * (isaac_float(1) - pos_in_cube.data[e].value.y) +
+                    data4[x][1].data[e] * (                 pos_in_cube.data[e].value.y);
+        ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+            data.data[e] =
+                data2[0].data[e] * (isaac_float(1) - pos_in_cube.data[e].value.x) +
+                data2[1].data[e] * (                 pos_in_cube.data[e].value.x);
     }
-    isaac_float result = isaac_float(0);
+    result = Vector<isaac_float,1>({0});
 
     #if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
-        if (TSource::feature_dim == 1)
-            result = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< Vector<float,1>* >(&data)), NR::value );
+    if (TSource::feature_dim == 1)
+            ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                result.array[e] = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< Vector<float,1>* >(&(data.data[e]))), NR::value );
         if (TSource::feature_dim == 2)
-            result = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< Vector<float,2>* >(&data)), NR::value );
+            ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                result.array[e] = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< Vector<float,2>* >(&(data.data[e]))), NR::value );
         if (TSource::feature_dim == 3)
-            result = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< Vector<float,3>* >(&data)), NR::value );
+            ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                result.array[e] = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< Vector<float,3>* >(&(data.data[e]))), NR::value );
         if (TSource::feature_dim == 4)
-            result = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< Vector<float,4>* >(&data)), NR::value );
+            ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
+                result.array[e] = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< Vector<float,4>* >(&(data.data[e]))), NR::value );
     #endif
     return result;
 }
@@ -282,126 +314,138 @@ struct merge_source_iterator
         typename TTransferArray,
         typename TSourceWeight,
         typename TPointerArray,
-        typename TFeedback,
         typename TStep,
         typename TStepLength,
-        typename TScale
+        typename TScale,
+        typename TLoopFinish
     >
-    ISAAC_HOST_DEVICE_INLINE  void operator()(
+    ISAAC_HOST_DEVICE_INLINE void operator()(
         const NR& nr,
         const TSource& source,
-        TColor& color,
-        const TPos& pos,
+        TColor& color, //array
+        const TPos& pos, //array
         const TLocalSize& local_size,
         const TTransferArray& transferArray,
         const TSourceWeight& sourceWeight,
         const TPointerArray& pointerArray,
-        TFeedback& feedback,
-        const TStep& step,
+        const TStep& step, //array
         const TStepLength& stepLength,
-        const TScale& scale
+        const TScale& scale,
+        TLoopFinish& loop_finish //array
     ) const
     {
         if ( mpl::at_c< TFilter, NR::value >::type::value )
         {
-            isaac_float result = get_value< TInterpolation, NR >( source, pos, pointerArray, local_size, scale );
-            isaac_int lookup_value = isaac_int( round(result * isaac_float( Ttransfer_size ) ) );
-            if (lookup_value < 0 )
-                lookup_value = 0;
-            if (lookup_value >= Ttransfer_size )
-                lookup_value = Ttransfer_size - 1;
-            Vector<float,4> value = transferArray.pointer[ NR::value ][ lookup_value ];
+            VectorArray<isaac_float,1,ISAAC_VECTOR_ELEM> result;
+            VectorArray<isaac_int,1,ISAAC_VECTOR_ELEM> lookup_value;
+            VectorArray<isaac_float,4,ISAAC_VECTOR_ELEM> value;
+            result = get_value< TInterpolation, NR, ISAAC_VECTOR_ELEM >( source, pos, pointerArray, local_size, scale, loop_finish );
+            ISAAC_ELEM_ITERATE(e)
+                lookup_value.array[e] = isaac_int( round(result.array[e] * isaac_float( Ttransfer_size ) ) );
+            ISAAC_ELEM_ITERATE(e)
+                if (lookup_value.array[e] < 0 )
+                    lookup_value.array[e] = 0;
+            ISAAC_ELEM_ITERATE(e)
+                if (lookup_value.array[e] >= Ttransfer_size )
+                    lookup_value.array[e] = Ttransfer_size - 1;
+            ISAAC_ELEM_ITERATE(e)
+                value.data[e] = transferArray.pointer[ NR::value ][ lookup_value.array[e] ];
             if (TIsoSurface)
             {
-                if (value.value.w >= isaac_float(0.5))
-                {
-                    Vector<float,3>  left = {-1, 0, 0};
-                    left = left + pos;
-                    if (!TSource::has_guard && TSource::persistent)
-                        check_coord( left, local_size);
-                    Vector<float,3> right = { 1, 0, 0};
-                    right = right + pos;
-                    if (!TSource::has_guard && TSource::persistent)
-                        check_coord( right, local_size );
-                    isaac_float d1;
-                    if (TInterpolation)
-                        d1 = right.value.x - left.value.x;
-                    else
-                        d1 = isaac_int(right.value.x) - isaac_int(left.value.x);
-
-                    Vector<float,3>    up = { 0,-1, 0};
-                    up = up + pos;
-                    if (!TSource::has_guard && TSource::persistent)
-                        check_coord( up, local_size );
-                    Vector<float,3>  down = { 0, 1, 0};
-                    down = down + pos;
-                    if (!TSource::has_guard && TSource::persistent)
-                        check_coord( down, local_size );
-                    isaac_float d2;
-                    if (TInterpolation)
-                        d2 = down.value.y - up.value.y;
-                    else
-                        d2 = isaac_int(down.value.y) - isaac_int(up.value.y);
-
-                    Vector<float,3> front = { 0, 0,-1};
-                    front = front + pos;
-                    if (!TSource::has_guard && TSource::persistent)
-                        check_coord( front, local_size );
-                    Vector<float,3>  back = { 0, 0, 1};
-                    back = back + pos;
-                    if (!TSource::has_guard && TSource::persistent)
-                        check_coord( back, local_size );
-                    isaac_float d3;
-                    if (TInterpolation)
-                        d3 = back.value.z - front.value.z;
-                    else
-                        d3 = isaac_int(back.value.z) - isaac_int(front.value.z);
-
-                    Vector<float,3> gradient=
+                ISAAC_ELEM_ITERATE(e)
+                    if (value.data[e].value.w >= isaac_float(0.5) && !loop_finish.array[e])
                     {
-                        (get_value< TInterpolation, NR >( source, right, pointerArray, local_size, scale ) -
-                         get_value< TInterpolation, NR >( source,  left, pointerArray, local_size, scale )) / d1,
-                        (get_value< TInterpolation, NR >( source,  down, pointerArray, local_size, scale ) -
-                         get_value< TInterpolation, NR >( source,    up, pointerArray, local_size, scale )) / d2,
-                        (get_value< TInterpolation, NR >( source,  back, pointerArray, local_size, scale ) -
-                         get_value< TInterpolation, NR >( source, front, pointerArray, local_size, scale )) / d3
-                    };
-                    isaac_float l = sqrt(
-                        gradient.value.x * gradient.value.x +
-                        gradient.value.y * gradient.value.y +
-                        gradient.value.z * gradient.value.z
-                    );
-                    if (l == isaac_float(0))
-                        color = value;
-                    else
-                    {
-                        gradient = gradient / l;
-                        Vector<float,3> light = step / stepLength;
-                        isaac_float ac = fabs(
-                            gradient.value.x * light.value.x +
-                            gradient.value.y * light.value.y +
-                            gradient.value.z * light.value.z );
-                        #if ISAAC_SPECULAR == 1
-                            color.value.x = value.value.x * ac + ac * ac * ac * ac;
-                            color.value.y = value.value.y * ac + ac * ac * ac * ac;
-                            color.value.z = value.value.z * ac + ac * ac * ac * ac;
-                        #else
-                            color.value.x = value.value.x * ac;
-                            color.value.y = value.value.y * ac;
-                            color.value.z = value.value.z * ac;
-                        #endif
+                        VectorArray<float,3,1>  left = {-1, 0, 0};
+                        left.data[0] = left.data[0] + pos.data[e];
+                        if (!TSource::has_guard && TSource::persistent)
+                            check_coord( left.data[0], local_size);
+                        VectorArray<float,3,1> right = { 1, 0, 0};
+                        right.data[0] = right.data[0] + pos.data[e];
+                        if (!TSource::has_guard && TSource::persistent)
+                            check_coord( right.data[0], local_size );
+                        isaac_float d1;
+                        if (TInterpolation)
+                            d1 = right.data[0].value.x - left.data[0].value.x;
+                        else
+                            d1 = isaac_int(right.data[0].value.x) - isaac_int(left.data[0].value.x);
+
+                        VectorArray<float,3,1>    up = { 0,-1, 0};
+                        up.data[0] = up.data[0] + pos.data[e];
+                        if (!TSource::has_guard && TSource::persistent)
+                            check_coord( up.data[0], local_size );
+                        VectorArray<float,3,1>  down = { 0, 1, 0};
+                        down.data[0] = down.data[0] + pos.data[e];
+                        if (!TSource::has_guard && TSource::persistent)
+                            check_coord( down.data[0], local_size );
+                        isaac_float d2;
+                        if (TInterpolation)
+                            d2 = down.data[0].value.y - up.data[0].value.y;
+                        else
+                            d2 = isaac_int(down.data[0].value.y) - isaac_int(up.data[0].value.y);
+
+                        VectorArray<float,3,1> front = { 0, 0,-1};
+                        front.data[0] = front.data[0] + pos.data[e];
+                        if (!TSource::has_guard && TSource::persistent)
+                            check_coord( front.data[0], local_size );
+                        VectorArray<float,3,1>  back = { 0, 0, 1};
+                        back.data[0] = back.data[0] + pos.data[e];
+                        if (!TSource::has_guard && TSource::persistent)
+                            check_coord( back.data[0], local_size );
+                        isaac_float d3;
+                        if (TInterpolation)
+                            d3 = back.data[0].value.z - front.data[0].value.z;
+                        else
+                            d3 = isaac_int(back.data[0].value.z) - isaac_int(front.data[0].value.z);
+
+                        Vector<float,3> gradient=
+                        {
+                            (get_value< TInterpolation, NR, 1 >( source, right, pointerArray, local_size, scale, VectorArray<bool,1,1>({0}) ).array[0] -
+                             get_value< TInterpolation, NR, 1 >( source,  left, pointerArray, local_size, scale, VectorArray<bool,1,1>({0}) ).array[0]) / d1,
+                            (get_value< TInterpolation, NR, 1 >( source,  down, pointerArray, local_size, scale, VectorArray<bool,1,1>({0}) ).array[0] -
+                             get_value< TInterpolation, NR, 1 >( source,    up, pointerArray, local_size, scale, VectorArray<bool,1,1>({0}) ).array[0]) / d2,
+                            (get_value< TInterpolation, NR, 1 >( source,  back, pointerArray, local_size, scale, VectorArray<bool,1,1>({0}) ).array[0] -
+                             get_value< TInterpolation, NR, 1 >( source, front, pointerArray, local_size, scale, VectorArray<bool,1,1>({0}) ).array[0]) / d3
+                        };
+                        isaac_float l = sqrt(
+                            gradient.value.x * gradient.value.x +
+                            gradient.value.y * gradient.value.y +
+                            gradient.value.z * gradient.value.z
+                        );
+                        if (l == isaac_float(0))
+                            color.data[e] = value.data[e];
+                        else
+                        {
+                            gradient = gradient / l;
+                            Vector<float,3> light = step.data[e] / stepLength;
+                            isaac_float ac = fabs(
+                                gradient.value.x * light.value.x +
+                                gradient.value.y * light.value.y +
+                                gradient.value.z * light.value.z );
+                            #if ISAAC_SPECULAR == 1
+                                color.data[e].value.x = value.data[e].value.x * ac + ac * ac * ac * ac;
+                                color.data[e].value.y = value.data[e].value.y * ac + ac * ac * ac * ac;
+                                color.data[e].value.z = value.data[e].value.z * ac + ac * ac * ac * ac;
+                            #else
+                                color.data[e].value.x = value.data[e].value.x * ac;
+                                color.data[e].value.y = value.data[e].value.y * ac;
+                                color.data[e].value.z = value.data[e].value.z * ac;
+                            #endif
+                        }
+                        color.data[e].value.w = isaac_float(-1);
+                        loop_finish.array[e] = true;
                     }
-                    color.value.w = isaac_float(1);
-                    feedback = 1;
-                }
             }
             else
             {
-                value.value.w *= sourceWeight.value[ NR::value ];
-                color.value.x = color.value.x + value.value.x * value.value.w;
-                color.value.y = color.value.y + value.value.y * value.value.w;
-                color.value.z = color.value.z + value.value.z * value.value.w;
-                color.value.w = color.value.w + value.value.w;
+                ISAAC_ELEM_ITERATE(e)
+                    value.data[e].value.w *= sourceWeight.value[ NR::value ];
+                ISAAC_ELEM_ITERATE(e)
+                    value.data[e].value.x *= value.data[e].value.w;
+                ISAAC_ELEM_ITERATE(e)
+                    value.data[e].value.y *= value.data[e].value.w;
+                ISAAC_ELEM_ITERATE(e)
+                    value.data[e].value.z *= value.data[e].value.w;
+                color = color + value;
             }
         }
     }
@@ -465,312 +509,367 @@ template <
         const
 #endif
         {
-            Vector<uint32_t,2> pixel[ISAAC_VECTOR_ELEM];
-            bool finish[ISAAC_VECTOR_ELEM];
+            VectorArray<uint32_t,2,ISAAC_VECTOR_ELEM> pixel;
+            VectorArray<bool,1,ISAAC_VECTOR_ELEM> finish;
 #if ISAAC_ALPAKA == 1
             auto threadIdx = alpaka::idx::getIdx<alpaka::Grid, alpaka::Threads>(acc);
             ISAAC_ELEM_ITERATE(e)
             {
-                pixel[e].value.x = isaac_uint(threadIdx[2]) * isaac_uint(ISAAC_VECTOR_ELEM) + e;
-                pixel[e].value.y = isaac_uint(threadIdx[1]);
+                pixel.data[e].value.x = isaac_uint(threadIdx[2]) * isaac_uint(ISAAC_VECTOR_ELEM) + e;
+                pixel.data[e].value.y = isaac_uint(threadIdx[1]);
 #else
             ISAAC_ELEM_ITERATE(e)
             {
-                pixel[e].value.x = isaac_uint(threadIdx.x + blockIdx.x * blockDim.x) * isaac_uint(ISAAC_VECTOR_ELEM) + e;
-                pixel[e].value.y = isaac_uint(threadIdx.y + blockIdx.y * blockDim.y);
+                pixel.data[e].value.x = isaac_uint(threadIdx.x + blockIdx.x * blockDim.x) * isaac_uint(ISAAC_VECTOR_ELEM) + e;
+                pixel.data[e].value.y = isaac_uint(threadIdx.y + blockIdx.y * blockDim.y);
 #endif
-                finish[e] = false;
-                pixel[e] = pixel[e] + framebuffer_start;
-                if ( ISAAC_FOR_EACH_DIM_TWICE(2, pixel[e], >= framebuffer_size, || ) 0 )
-                    finish[e] = true;
+                finish.array[e] = false;
+                pixel.data[e] = pixel.data[e] + framebuffer_start;
+                if ( ISAAC_FOR_EACH_DIM_TWICE(2, pixel.data[e], >= framebuffer_size, || ) 0 )
+                    finish.array[e] = true;
             }
-            ISAAC_ELEM_ALL_TRUE_RETURN( finish )
+            ISAAC_ELEM_ALL_TRUE_RETURN( finish.array )
 
-            bool at_least_one[ISAAC_VECTOR_ELEM];
-            Vector<float,4> color[ISAAC_VECTOR_ELEM];
+            VectorArray<bool,1,ISAAC_VECTOR_ELEM> at_least_one;
+            VectorArray<float,4,ISAAC_VECTOR_ELEM> color;
 
             ISAAC_ELEM_ITERATE(e)
             {
-                color[e] = background_color;
-                at_least_one[e] = true;
-                isaac_for_each_with_mpl_params( sources, check_no_source_iterator<TFilter>(), at_least_one[e] );
-                if (!at_least_one[e])
+                color.data[e] = background_color;
+                at_least_one.array[e] = true;
+                isaac_for_each_with_mpl_params( sources, check_no_source_iterator<TFilter>(), at_least_one.array[e] );
+                if (!at_least_one.array[e])
                 {
-                    if (!finish[e])
-                        ISAAC_SET_COLOR( pixels[pixel[e].value.x + pixel[e].value.y * framebuffer_size.value.x], color[e] )
-                    finish[e] = true;
+                    if (!finish.array[e])
+                        ISAAC_SET_COLOR( pixels[pixel.data[e].value.x + pixel.data[e].value.y * framebuffer_size.value.x], color.data[e] )
+                    finish.array[e] = true;
                 }
             }
-            ISAAC_ELEM_ALL_TRUE_RETURN( finish )
+            ISAAC_ELEM_ALL_TRUE_RETURN( finish.array )
 
-            Vector<float,2> pixel_f[ISAAC_VECTOR_ELEM];
-            Vector<float,4> start_p[ISAAC_VECTOR_ELEM];
-            Vector<float,4> end_p[ISAAC_VECTOR_ELEM];
-            Vector<float,3> start[ISAAC_VECTOR_ELEM];
-            Vector<float,3> end[ISAAC_VECTOR_ELEM];
-            Vector<int,3> move[ISAAC_VECTOR_ELEM];
-            Vector<float,3> move_f[ISAAC_VECTOR_ELEM];
+            VectorArray<float,2,ISAAC_VECTOR_ELEM> pixel_f;
+            VectorArray<float,4,ISAAC_VECTOR_ELEM> start_p;
+            VectorArray<float,4,ISAAC_VECTOR_ELEM> end_p;
+            VectorArray<float,3,ISAAC_VECTOR_ELEM> start;
+            VectorArray<float,3,ISAAC_VECTOR_ELEM> end;
+            VectorArray<int,3,ISAAC_VECTOR_ELEM> move;
+            VectorArray<float,3,ISAAC_VECTOR_ELEM> move_f;
             clipping_struct clipping[ISAAC_VECTOR_ELEM];
-            Vector<float,3> vec[ISAAC_VECTOR_ELEM];
-            isaac_float l_scaled[ISAAC_VECTOR_ELEM];
-            isaac_float l[ISAAC_VECTOR_ELEM];
-            Vector<float,3> step_vec[ISAAC_VECTOR_ELEM];
-            Vector<float,3> count_start[ISAAC_VECTOR_ELEM];
-            Vector<float,3> local_size_f[ISAAC_VECTOR_ELEM];
-            Vector<float,3> count_end[ISAAC_VECTOR_ELEM];
+            VectorArray<float,3,ISAAC_VECTOR_ELEM> vec;
+            VectorArray<isaac_float,1,ISAAC_VECTOR_ELEM> l_scaled;
+            VectorArray<isaac_float,1,ISAAC_VECTOR_ELEM> l;
+            VectorArray<isaac_float,1,ISAAC_VECTOR_ELEM> max_size;
+            VectorArray<float,3,ISAAC_VECTOR_ELEM> step_vec;
+            VectorArray<float,3,ISAAC_VECTOR_ELEM> count_start;
+            VectorArray<float,3,ISAAC_VECTOR_ELEM> local_size_f;
+            VectorArray<float,3,ISAAC_VECTOR_ELEM> count_end;
 
             ISAAC_ELEM_ITERATE(e)
-            {
-                pixel_f[e].value.x = isaac_float( pixel[e].value.x )/(isaac_float)framebuffer_size.value.x*isaac_float(2)-isaac_float(1);
-                pixel_f[e].value.y = isaac_float( pixel[e].value.y )/(isaac_float)framebuffer_size.value.y*isaac_float(2)-isaac_float(1);
+                pixel_f.data[e].value.x = isaac_float( pixel.data[e].value.x )/(isaac_float)framebuffer_size.value.x*isaac_float(2)-isaac_float(1);
+            ISAAC_ELEM_ITERATE(e)
+                pixel_f.data[e].value.y = isaac_float( pixel.data[e].value.y )/(isaac_float)framebuffer_size.value.y*isaac_float(2)-isaac_float(1);
 
-                start_p[e].value.x = pixel_f[e].value.x*ISAAC_Z_NEAR;
-                start_p[e].value.y = pixel_f[e].value.y*ISAAC_Z_NEAR;
-                start_p[e].value.z = -1.0f*ISAAC_Z_NEAR;
-                start_p[e].value.w = 1.0f*ISAAC_Z_NEAR;
+            ISAAC_ELEM_ITERATE(e)
+                start_p.data[e].value.x = pixel_f.data[e].value.x*ISAAC_Z_NEAR;
+            ISAAC_ELEM_ITERATE(e)
+                start_p.data[e].value.y = pixel_f.data[e].value.y*ISAAC_Z_NEAR;
+            ISAAC_ELEM_ITERATE(e)
+                start_p.data[e].value.z = -1.0f*ISAAC_Z_NEAR;
+            ISAAC_ELEM_ITERATE(e)
+                start_p.data[e].value.w = 1.0f*ISAAC_Z_NEAR;
 
-                end_p[e].value.x = pixel_f[e].value.x*ISAAC_Z_FAR;
-                end_p[e].value.y = pixel_f[e].value.y*ISAAC_Z_FAR;
-                end_p[e].value.z = 1.0f*ISAAC_Z_FAR;
-                end_p[e].value.w = 1.0f*ISAAC_Z_FAR;
+            ISAAC_ELEM_ITERATE(e)
+                end_p.data[e].value.x = pixel_f.data[e].value.x*ISAAC_Z_FAR;
+            ISAAC_ELEM_ITERATE(e)
+                end_p.data[e].value.y = pixel_f.data[e].value.y*ISAAC_Z_FAR;
+            ISAAC_ELEM_ITERATE(e)
+                end_p.data[e].value.z = 1.0f*ISAAC_Z_FAR;
+            ISAAC_ELEM_ITERATE(e)
+                end_p.data[e].value.w = 1.0f*ISAAC_Z_FAR;
 
-                start[e].value.x = isaac_inverse_d[ 0] * start_p[e].value.x + isaac_inverse_d[ 4] * start_p[e].value.y +  isaac_inverse_d[ 8] * start_p[e].value.z + isaac_inverse_d[12] * start_p[e].value.w;
-                start[e].value.y = isaac_inverse_d[ 1] * start_p[e].value.x + isaac_inverse_d[ 5] * start_p[e].value.y +  isaac_inverse_d[ 9] * start_p[e].value.z + isaac_inverse_d[13] * start_p[e].value.w;
-                start[e].value.z = isaac_inverse_d[ 2] * start_p[e].value.x + isaac_inverse_d[ 6] * start_p[e].value.y +  isaac_inverse_d[10] * start_p[e].value.z + isaac_inverse_d[14] * start_p[e].value.w;
+            ISAAC_ELEM_ITERATE(e)
+                start.data[e].value.x = isaac_inverse_d[ 0] * start_p.data[e].value.x + isaac_inverse_d[ 4] * start_p.data[e].value.y +  isaac_inverse_d[ 8] * start_p.data[e].value.z + isaac_inverse_d[12] * start_p.data[e].value.w;
+            ISAAC_ELEM_ITERATE(e)
+                start.data[e].value.y = isaac_inverse_d[ 1] * start_p.data[e].value.x + isaac_inverse_d[ 5] * start_p.data[e].value.y +  isaac_inverse_d[ 9] * start_p.data[e].value.z + isaac_inverse_d[13] * start_p.data[e].value.w;
+            ISAAC_ELEM_ITERATE(e)
+                start.data[e].value.z = isaac_inverse_d[ 2] * start_p.data[e].value.x + isaac_inverse_d[ 6] * start_p.data[e].value.y +  isaac_inverse_d[10] * start_p.data[e].value.z + isaac_inverse_d[14] * start_p.data[e].value.w;
 
-                end[e].value.x =   isaac_inverse_d[ 0] *   end_p[e].value.x + isaac_inverse_d[ 4] *   end_p[e].value.y +  isaac_inverse_d[ 8] *   end_p[e].value.z + isaac_inverse_d[12] *   end_p[e].value.w;
-                end[e].value.y =   isaac_inverse_d[ 1] *   end_p[e].value.x + isaac_inverse_d[ 5] *   end_p[e].value.y +  isaac_inverse_d[ 9] *   end_p[e].value.z + isaac_inverse_d[13] *   end_p[e].value.w;
-                end[e].value.z =   isaac_inverse_d[ 2] *   end_p[e].value.x + isaac_inverse_d[ 6] *   end_p[e].value.y +  isaac_inverse_d[10] *   end_p[e].value.z + isaac_inverse_d[14] *   end_p[e].value.w;
-                isaac_float max_size = isaac_size_d[0].max_global_size_scaled / 2.0f;
+            ISAAC_ELEM_ITERATE(e)
+                end.data[e].value.x =   isaac_inverse_d[ 0] *   end_p.data[e].value.x + isaac_inverse_d[ 4] *   end_p.data[e].value.y +  isaac_inverse_d[ 8] *   end_p.data[e].value.z + isaac_inverse_d[12] *   end_p.data[e].value.w;
+            ISAAC_ELEM_ITERATE(e)
+                end.data[e].value.y =   isaac_inverse_d[ 1] *   end_p.data[e].value.x + isaac_inverse_d[ 5] *   end_p.data[e].value.y +  isaac_inverse_d[ 9] *   end_p.data[e].value.z + isaac_inverse_d[13] *   end_p.data[e].value.w;
+            ISAAC_ELEM_ITERATE(e)
+                end.data[e].value.z =   isaac_inverse_d[ 2] *   end_p.data[e].value.x + isaac_inverse_d[ 6] *   end_p.data[e].value.y +  isaac_inverse_d[10] *   end_p.data[e].value.z + isaac_inverse_d[14] *   end_p.data[e].value.w;
+            ISAAC_ELEM_ITERATE(e)
+                max_size.array[e] = isaac_size_d[0].max_global_size_scaled / 2.0f;
 
                 //scale to globale grid size
-                start[e] = start[e] * max_size;
-                  end[e] =   end[e] * max_size;
+                start = start * max_size;
+                  end =   end * max_size;
 
-                for (isaac_int i = 0; i < input_clipping.count; i++)
-                {
-                    clipping[e].elem[i].position = input_clipping.elem[i].position * max_size;
+            for (isaac_int i = 0; i < input_clipping.count; i++)
+            {
+                ISAAC_ELEM_ITERATE(e)
+                    clipping[e].elem[i].position = input_clipping.elem[i].position * max_size.array[e];
+                ISAAC_ELEM_ITERATE(e)
                     clipping[e].elem[i].normal   = input_clipping.elem[i].normal;
-                }
+            }
 
                 //move to local (scaled) grid
-                move[e].value.x = isaac_int(isaac_size_d[0].global_size_scaled.value.x) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.x);
-                move[e].value.y = isaac_int(isaac_size_d[0].global_size_scaled.value.y) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.y);
-                move[e].value.z = isaac_int(isaac_size_d[0].global_size_scaled.value.z) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.z);
-
-                move_f[e].value.x = isaac_float(move[e].value.x);
-                move_f[e].value.y = isaac_float(move[e].value.y);
-                move_f[e].value.z = isaac_float(move[e].value.z);
-
-                start[e] = start[e] + move_f[e];
-                  end[e] =   end[e] + move_f[e];
-                for (isaac_int i = 0; i < input_clipping.count; i++)
-                    clipping[e].elem[i].position = clipping[e].elem[i].position + move_f[e];
-
-                vec[e] = end[e] - start[e];
-                l_scaled[e] = sqrt( vec[e].value.x * vec[e].value.x + vec[e].value.y * vec[e].value.y + vec[e].value.z * vec[e].value.z );
-
-                start[e].value.x = start[e].value.x / scale.value.x;
-                start[e].value.y = start[e].value.y / scale.value.y;
-                start[e].value.z = start[e].value.z / scale.value.z;
-                  end[e].value.x =   end[e].value.x / scale.value.x;
-                  end[e].value.y =   end[e].value.y / scale.value.y;
-                  end[e].value.z =   end[e].value.z / scale.value.z;
-                for (isaac_int i = 0; i < input_clipping.count; i++)
-                {
-                    clipping[e].elem[i].position.value.x = clipping[e].elem[i].position.value.x / scale.value.x;
-                    clipping[e].elem[i].position.value.y = clipping[e].elem[i].position.value.y / scale.value.y;
-                    clipping[e].elem[i].position.value.z = clipping[e].elem[i].position.value.z / scale.value.z;
-                }
-
-                vec[e] = end[e] - start[e];
-                l[e] = sqrt( vec[e].value.x * vec[e].value.x + vec[e].value.y * vec[e].value.y + vec[e].value.z * vec[e].value.z );
-
-                step_vec[e] = vec[e] / l[e] * step;
-                count_start[e] =  - start[e] / step_vec[e];
-                local_size_f[e].value.x = isaac_float(isaac_size_d[0].local_size.value.x);
-                local_size_f[e].value.y = isaac_float(isaac_size_d[0].local_size.value.y);
-                local_size_f[e].value.z = isaac_float(isaac_size_d[0].local_size.value.z);
-
-                count_end[e] = ( local_size_f[e] - start[e] ) / step_vec[e];
-
-                //count_start shall have the smaller values
-                ISAAC_SWITCH_IF_SMALLER( count_end[e].value.x, count_start[e].value.x )
-                ISAAC_SWITCH_IF_SMALLER( count_end[e].value.y, count_start[e].value.y )
-                ISAAC_SWITCH_IF_SMALLER( count_end[e].value.z, count_start[e].value.z )
-
-                //calc intersection of all three super planes and save in [count_start.x ; count_end.x]
-                count_start[e].value.x = ISAAC_MAX( ISAAC_MAX( count_start[e].value.x, count_start[e].value.y ), count_start[e].value.z );
-                  count_end[e].value.x = ISAAC_MIN( ISAAC_MIN(   count_end[e].value.x,   count_end[e].value.y ),   count_end[e].value.z );
-                if ( count_start[e].value.x > count_end[e].value.x)
-                {
-                    if (!finish[e])
-                        ISAAC_SET_COLOR( pixels[pixel[e].value.x + pixel[e].value.y * framebuffer_size.value.x], color[e] )
-                    finish[e] = true;
-                }
-            }
-            ISAAC_ELEM_ALL_TRUE_RETURN( finish )
-
-            isaac_int first[ISAAC_VECTOR_ELEM];
-            isaac_int last[ISAAC_VECTOR_ELEM];
-            Vector<float,3> pos[ISAAC_VECTOR_ELEM];
-            Vector<int,3> coord[ISAAC_VECTOR_ELEM];
-            isaac_float d[ISAAC_VECTOR_ELEM];
-            isaac_float intersection_step[ISAAC_VECTOR_ELEM];
+            ISAAC_ELEM_ITERATE(e)
+                move.data[e].value.x = isaac_int(isaac_size_d[0].global_size_scaled.value.x) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.x);
+            ISAAC_ELEM_ITERATE(e)
+                move.data[e].value.y = isaac_int(isaac_size_d[0].global_size_scaled.value.y) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.y);
+            ISAAC_ELEM_ITERATE(e)
+                move.data[e].value.z = isaac_int(isaac_size_d[0].global_size_scaled.value.z) / isaac_int(2) - isaac_int(isaac_size_d[0].position_scaled.value.z);
 
             ISAAC_ELEM_ITERATE(e)
-            {
-                first[e] = isaac_int( floor(count_start[e].value.x) );
-                last[e] = isaac_int( ceil(count_end[e].value.x) );
+                move_f.data[e].value.x = isaac_float(move.data[e].value.x);
+            ISAAC_ELEM_ITERATE(e)
+                move_f.data[e].value.y = isaac_float(move.data[e].value.y);
+            ISAAC_ELEM_ITERATE(e)
+                move_f.data[e].value.z = isaac_float(move.data[e].value.z);
+
+            start = start + move_f;
+              end = end   + move_f;
+            for (isaac_int i = 0; i < input_clipping.count; i++)
+                ISAAC_ELEM_ITERATE(e)
+                    clipping[e].elem[i].position = clipping[e].elem[i].position + move_f.data[e];
+
+            vec = end - start;
+            ISAAC_ELEM_ITERATE(e)
+                l_scaled.array[e] = sqrt( vec.data[e].value.x * vec.data[e].value.x + vec.data[e].value.y * vec.data[e].value.y + vec.data[e].value.z * vec.data[e].value.z );
+
+            start = start / scale;
+              end =   end / scale;
+            for (isaac_int i = 0; i < input_clipping.count; i++)
+                ISAAC_ELEM_ITERATE(e)
+                    clipping[e].elem[i].position = clipping[e].elem[i].position / scale;
+
+            vec = end - start;
+            ISAAC_ELEM_ITERATE(e)
+                l.array[e] = sqrt( vec.data[e].value.x * vec.data[e].value.x + vec.data[e].value.y * vec.data[e].value.y + vec.data[e].value.z * vec.data[e].value.z );
+
+            step_vec = vec / l * step;
+            count_start =  - start / step_vec;
+            ISAAC_ELEM_ITERATE(e)
+                local_size_f.data[e].value.x = isaac_float(isaac_size_d[0].local_size.value.x);
+            ISAAC_ELEM_ITERATE(e)
+                local_size_f.data[e].value.y = isaac_float(isaac_size_d[0].local_size.value.y);
+            ISAAC_ELEM_ITERATE(e)
+                local_size_f.data[e].value.z = isaac_float(isaac_size_d[0].local_size.value.z);
+
+            count_end = ( local_size_f - start ) / step_vec;
+
+                //count_start shall have the smaller values
+            ISAAC_ELEM_ITERATE(e)
+                ISAAC_SWITCH_IF_SMALLER( count_end.data[e].value.x, count_start.data[e].value.x )
+            ISAAC_ELEM_ITERATE(e)
+                ISAAC_SWITCH_IF_SMALLER( count_end.data[e].value.y, count_start.data[e].value.y )
+            ISAAC_ELEM_ITERATE(e)
+                ISAAC_SWITCH_IF_SMALLER( count_end.data[e].value.z, count_start.data[e].value.z )
+
+                //calc intersection of all three super planes and save in [count_start.x ; count_end.x]
+            ISAAC_ELEM_ITERATE(e)
+                count_start.data[e].value.x = ISAAC_MAX( ISAAC_MAX( count_start.data[e].value.x, count_start.data[e].value.y ), count_start.data[e].value.z );
+            ISAAC_ELEM_ITERATE(e)
+                  count_end.data[e].value.x = ISAAC_MIN( ISAAC_MIN(   count_end.data[e].value.x,   count_end.data[e].value.y ),   count_end.data[e].value.z );
+            ISAAC_ELEM_ITERATE(e)
+                if ( count_start.data[e].value.x > count_end.data[e].value.x)
+                {
+                    if (!finish.array[e])
+                        ISAAC_SET_COLOR( pixels[pixel.data[e].value.x + pixel.data[e].value.y * framebuffer_size.value.x], color.data[e] )
+                    finish.array[e] = true;
+                }
+
+            ISAAC_ELEM_ALL_TRUE_RETURN( finish.array )
+
+            VectorArray<isaac_int,1,ISAAC_VECTOR_ELEM> first;
+            VectorArray<isaac_int,1,ISAAC_VECTOR_ELEM> last;
+            VectorArray<isaac_float,3,ISAAC_VECTOR_ELEM> pos;
+            VectorArray<isaac_int,3,ISAAC_VECTOR_ELEM> coord;
+            VectorArray<isaac_float,1,ISAAC_VECTOR_ELEM> d;
+            VectorArray<isaac_float,1,ISAAC_VECTOR_ELEM> intersection_step;
+
+            ISAAC_ELEM_ITERATE(e)
+                first.array[e] = isaac_int( floor(count_start.data[e].value.x) );
+            ISAAC_ELEM_ITERATE(e)
+                last.array[e] = isaac_int( ceil(count_end.data[e].value.x) );
 
                 //Moving last and first until their points are valid
-                pos[e] = start[e] + step_vec[e] * isaac_float(last[e]);
-                coord[e].value.x = isaac_int(floor(pos[e].value.x));
-                coord[e].value.y = isaac_int(floor(pos[e].value.y));
-                coord[e].value.z = isaac_int(floor(pos[e].value.z));
-                while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord[e], >= isaac_size_d[0].local_size, || )
-                         ISAAC_FOR_EACH_DIM      (3, coord[e], < 0 || ) 0 ) && first[e] <= last[e])
+            ISAAC_ELEM_ITERATE(e)
+                pos.data[e] = start.data[e] + step_vec.data[e] * isaac_float(last.array[e]);
+            ISAAC_ELEM_ITERATE(e)
+                coord.data[e].value.x = isaac_int(floor(pos.data[e].value.x));
+            ISAAC_ELEM_ITERATE(e)
+                coord.data[e].value.y = isaac_int(floor(pos.data[e].value.y));
+            ISAAC_ELEM_ITERATE(e)
+                coord.data[e].value.z = isaac_int(floor(pos.data[e].value.z));
+            ISAAC_ELEM_ITERATE(e)
+                while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord.data[e], >= isaac_size_d[0].local_size, || )
+                         ISAAC_FOR_EACH_DIM      (3, coord.data[e], < 0 || ) 0 ) && first.array[e] <= last.array[e])
                 {
-                    last[e]--;
-                    pos[e] = start[e] + step_vec[e] * isaac_float(last[e]);
-                    coord[e].value.x = isaac_int(floor(pos[e].value.x));
-                    coord[e].value.y = isaac_int(floor(pos[e].value.y));
-                    coord[e].value.z = isaac_int(floor(pos[e].value.z));
+                    last.array[e]--;
+                    pos.data[e] = start.data[e] + step_vec.data[e] * isaac_float(last.array[e]);
+                    coord.data[e].value.x = isaac_int(floor(pos.data[e].value.x));
+                    coord.data[e].value.y = isaac_int(floor(pos.data[e].value.y));
+                    coord.data[e].value.z = isaac_int(floor(pos.data[e].value.z));
                 }
-                pos[e] = start[e] + step_vec[e] * isaac_float(first[e]);
-                coord[e].value.x = isaac_int(floor(pos[e].value.x));
-                coord[e].value.y = isaac_int(floor(pos[e].value.y));
-                coord[e].value.z = isaac_int(floor(pos[e].value.z));
-                while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord[e], >= isaac_size_d[0].local_size, || )
-                         ISAAC_FOR_EACH_DIM      (3, coord[e], < 0 || ) 0 ) && first[e] <= last[e])
+            ISAAC_ELEM_ITERATE(e)
+                pos.data[e] = start.data[e] + step_vec.data[e] * isaac_float(first.array[e]);
+            ISAAC_ELEM_ITERATE(e)
+                coord.data[e].value.x = isaac_int(floor(pos.data[e].value.x));
+            ISAAC_ELEM_ITERATE(e)
+                coord.data[e].value.y = isaac_int(floor(pos.data[e].value.y));
+            ISAAC_ELEM_ITERATE(e)
+                coord.data[e].value.z = isaac_int(floor(pos.data[e].value.z));
+            ISAAC_ELEM_ITERATE(e)
+                while ( (ISAAC_FOR_EACH_DIM_TWICE(3, coord.data[e], >= isaac_size_d[0].local_size, || )
+                         ISAAC_FOR_EACH_DIM      (3, coord.data[e], < 0 || ) 0 ) && first.array[e] <= last.array[e])
                 {
-                    first[e]++;
-                    pos[e] = start[e] + step_vec[e] * isaac_float(first[e]);
-                    coord[e].value.x = isaac_int(floor(pos[e].value.x));
-                    coord[e].value.y = isaac_int(floor(pos[e].value.y));
-                    coord[e].value.z = isaac_int(floor(pos[e].value.z));
+                    first.array[e]++;
+                    pos.data[e] = start.data[e] + step_vec.data[e] * isaac_float(first.array[e]);
+                    coord.data[e].value.x = isaac_int(floor(pos.data[e].value.x));
+                    coord.data[e].value.y = isaac_int(floor(pos.data[e].value.y));
+                    coord.data[e].value.z = isaac_int(floor(pos.data[e].value.z));
                 }
 
-                //Extra clipping
-                for (isaac_int i = 0; i < input_clipping.count; i++)
-                {
-                    d[e] = step_vec[e].value.x * clipping[e].elem[i].normal.value.x
-                         + step_vec[e].value.y * clipping[e].elem[i].normal.value.y
-                         + step_vec[e].value.z * clipping[e].elem[i].normal.value.z;
-                    intersection_step[e] = ( clipping[e].elem[i].position.value.x * clipping[e].elem[i].normal.value.x
-                                           + clipping[e].elem[i].position.value.y * clipping[e].elem[i].normal.value.y
-                                           + clipping[e].elem[i].position.value.z * clipping[e].elem[i].normal.value.z
-                                           -                     start[e].value.x * clipping[e].elem[i].normal.value.x
-                                           -                     start[e].value.y * clipping[e].elem[i].normal.value.y
-                                           -                     start[e].value.z * clipping[e].elem[i].normal.value.z ) / d[e];
-                    if (d[e] > 0)
+            //Extra clipping
+            for (isaac_int i = 0; i < input_clipping.count; i++)
+            {
+                ISAAC_ELEM_ITERATE(e)
+                    d.array[e] = step_vec.data[e].value.x * clipping[e].elem[i].normal.value.x
+                               + step_vec.data[e].value.y * clipping[e].elem[i].normal.value.y
+                               + step_vec.data[e].value.z * clipping[e].elem[i].normal.value.z;
+                ISAAC_ELEM_ITERATE(e)
+                    intersection_step.array[e] = ( clipping[e].elem[i].position.value.x * clipping[e].elem[i].normal.value.x
+                                                 + clipping[e].elem[i].position.value.y * clipping[e].elem[i].normal.value.y
+                                                 + clipping[e].elem[i].position.value.z * clipping[e].elem[i].normal.value.z
+                                                 -                start.data[e].value.x * clipping[e].elem[i].normal.value.x
+                                                 -                start.data[e].value.y * clipping[e].elem[i].normal.value.y
+                                                 -                start.data[e].value.z * clipping[e].elem[i].normal.value.z ) / d.array[e];
+                ISAAC_ELEM_ITERATE(e)
+                    if (d.array[e] > 0)
                     {
-                        if ( last[e] < intersection_step[e] )
+                        if ( last.array[e] < intersection_step.array[e] )
                         {
-                            if (!finish[e])
-                                ISAAC_SET_COLOR( pixels[pixel[e].value.x + pixel[e].value.y * framebuffer_size.value.x], color[e] )
-                            finish[e] = true;
+                            if (!finish.array[e])
+                                ISAAC_SET_COLOR( pixels[pixel.data[e].value.x + pixel.data[e].value.y * framebuffer_size.value.x], color.data[e] )
+                            finish.array[e] = true;
                         }
-                        if ( first[e] < intersection_step[e] )
-                            first[e] = ceil( intersection_step[e] );
+                        if ( first.array[e] < intersection_step.array[e] )
+                            first.array[e] = ceil( intersection_step.array[e] );
                     }
                     else
                     {
-                        if ( first[e] > intersection_step[e] )
+                        if ( first.array[e] > intersection_step.array[e] )
                         {
-                            if (!finish[e])
-                                ISAAC_SET_COLOR( pixels[pixel[e].value.x + pixel[e].value.y * framebuffer_size.value.x], color[e] )
-                            finish[e] = true;
+                            if (!finish.array[e])
+                                ISAAC_SET_COLOR( pixels[pixel.data[e].value.x + pixel.data[e].value.y * framebuffer_size.value.x], color.data[e] )
+                            finish.array[e] = true;
                         }
-                        if ( last[e] > intersection_step[e] )
-                            last[e] = floor( intersection_step[e] );
+                        if ( last.array[e] > intersection_step.array[e] )
+                            last.array[e] = floor( intersection_step.array[e] );
                     }
-                }
             }
-            ISAAC_ELEM_ALL_TRUE_RETURN( finish )
+            ISAAC_ELEM_ALL_TRUE_RETURN( finish.array )
 
-            isaac_float min_size[ISAAC_VECTOR_ELEM];
-            isaac_float factor[ISAAC_VECTOR_ELEM];
-            Vector<float,4> value[ISAAC_VECTOR_ELEM];
-            isaac_int result[ISAAC_VECTOR_ELEM];
-            isaac_float oma[ISAAC_VECTOR_ELEM];
-            Vector<float,4> color_add[ISAAC_VECTOR_ELEM];
+            VectorArray<isaac_float,1,ISAAC_VECTOR_ELEM> min_size;
+            VectorArray<isaac_float,1,ISAAC_VECTOR_ELEM> factor;
+            VectorArray<isaac_float,4,ISAAC_VECTOR_ELEM> value;
+            VectorArray<isaac_float,1,ISAAC_VECTOR_ELEM> oma;
+            VectorArray<isaac_float,4,ISAAC_VECTOR_ELEM> color_add;
 
-            ISAAC_ELEM_ITERATE(e)
-            {
                 //Starting the main loop
-                min_size[e] = ISAAC_MIN(
+            ISAAC_ELEM_ITERATE(e)
+                min_size.array[e] = ISAAC_MIN(
                     int(isaac_size_d[0].global_size.value.x), ISAAC_MIN (
                     int(isaac_size_d[0].global_size.value.y),
                     int(isaac_size_d[0].global_size.value.z) ) );
-                factor[e] = step / /*isaac_size_d[0].max_global_size*/ min_size[e] * isaac_float(2) * l[e]/l_scaled[e];
-                for (isaac_int i = first[e]; i <= last[e]; i++)
+            ISAAC_ELEM_ITERATE(e)
+                factor.array[e] = step / /*isaac_size_d[0].max_global_size*/ min_size.array[e] * isaac_float(2) * l.array[e]/l_scaled.array[e];
+            VectorArray<bool,1,ISAAC_VECTOR_ELEM> loop_finish = finish;
+            for (VectorArray<isaac_int,1,ISAAC_VECTOR_ELEM> i = first;; i = i + 1)
+            {
+                ISAAC_ELEM_ITERATE(e)
+                    if (!loop_finish.array[e] && i.array[e] > last.array[e])
+                    {
+                        loop_finish.array[e] = true;
+                    }
+                ISAAC_ELEM_ALL_TRUE_BREAK( loop_finish.array )
+                ISAAC_ELEM_ITERATE(e)
+                    pos.data[e] = start.data[e] + step_vec.data[e] * isaac_float(i.array[e]);
+                value = Vector<float,4>({0,0,0,0});
+                isaac_for_each_with_mpl_params
+                (
+                    sources,
+                    merge_source_iterator
+                    <
+                        Ttransfer_size,
+                        TFilter,
+                        TInterpolation,
+                        TIsoSurface
+                    >(),
+                    value, //array
+                    pos, //array
+                    isaac_size_d[0].local_size,
+                    transferArray,
+                    sourceWeight,
+                    pointerArray,
+                    step_vec, //array
+                    step,
+                    scale,
+                    loop_finish //array
+                );
+                if (TIsoSurface)
                 {
-                    pos[e] = start[e] + step_vec[e] * isaac_float(i);
-                    value[e].value.x = 0;
-                    value[e].value.y = 0;
-                    value[e].value.z = 0;
-                    value[e].value.w = 0;
-                    result[e] = 0;
-                    isaac_for_each_with_mpl_params
-                    (
-                        sources,
-                        merge_source_iterator
-                        <
-                            Ttransfer_size,
-                            TFilter,
-                            TInterpolation,
-                            TIsoSurface
-                        >(),
-                        value[e],
-                        pos[e],
-                        isaac_size_d[0].local_size,
-                        transferArray,
-                        sourceWeight,
-                        pointerArray,
-                        result[e],
-                        step_vec[e],
-                        step,
-                        scale
-                    );
-                    /*if ( mpl::size< TSourceList >::type::value > 1)
-                        value = value / isaac_float( mpl::size< TSourceList >::type::value );*/
-                    if (TIsoSurface)
-                    {
-                        if (result[e])
+                    ISAAC_ELEM_ITERATE(e)
+                        if (loop_finish.array[e] && value.data[e].value.w < isaac_float(0))
                         {
-                            color[e] = value[e];
-                            break;
+                            value.data[e].value.w = isaac_float(1);
+                            color.data[e] = value.data[e];
+                            loop_finish.array[e] = true;
                         }
-                    }
-                    else
-                    {
-                        oma[e] = isaac_float(1) - color[e].value.w;
-                        value[e] = value[e] * factor[e];
-                        color_add[e].value.x = oma[e] * value[e].value.x; // * value.value.w does merge_source_iterator
-                        color_add[e].value.y = oma[e] * value[e].value.y; // * value.value.w does merge_source_iterator
-                        color_add[e].value.z = oma[e] * value[e].value.z; // * value.value.w does merge_source_iterator
-                        color_add[e].value.w = oma[e] * value[e].value.w;
-                        color[e] = color[e] + color_add[e];
-                        if (color[e].value.w > isaac_float(0.99))
-                            break;
-                    }
+                    ISAAC_ELEM_ALL_TRUE_BREAK( loop_finish.array )
                 }
-                #if ISAAC_SHOWBORDER == 1
-                    if (color[e].value.w <= isaac_float(0.99))
-                    {
-                        oma[e] = isaac_float(1) - color[e].value.w;
-                        color_add[e].value.x = 0;
-                        color_add[e].value.y = 0;
-                        color_add[e].value.z = 0;
-                        color_add[e].value.w = oma[e] * factor[e] * isaac_float(10);
-                        };
-                        color[e] = color[e] + color_add[e];
-                    }
-                #endif
-                if (!finish[e])
-                    ISAAC_SET_COLOR( pixels[pixel[e].value.x + pixel[e].value.y * framebuffer_size.value.x], color[e] )
+                else
+                {
+                    ISAAC_ELEM_ITERATE(e)
+                        oma.array[e] = isaac_float(1) - color.data[e].value.w;
+                    ISAAC_ELEM_ITERATE(e)
+                        value.data[e] = value.data[e] * factor.array[e];
+                    ISAAC_ELEM_ITERATE(e)
+                        color_add.data[e].value.x = oma.array[e] * value.data[e].value.x; // * value.value.w does merge_source_iterator
+                    ISAAC_ELEM_ITERATE(e)
+                        color_add.data[e].value.y = oma.array[e] * value.data[e].value.y; // * value.value.w does merge_source_iterator
+                    ISAAC_ELEM_ITERATE(e)
+                        color_add.data[e].value.z = oma.array[e] * value.data[e].value.z; // * value.value.w does merge_source_iterator
+                    ISAAC_ELEM_ITERATE(e)
+                        color_add.data[e].value.w = oma.array[e] * value.data[e].value.w;
+                    ISAAC_ELEM_ITERATE(e)
+                        if (!loop_finish.array[e])
+                            color.data[e] = color.data[e] + color_add.data[e];
+                    ISAAC_ELEM_ITERATE(e)
+                        if (color.data[e].value.w > isaac_float(0.99))
+                            loop_finish.array[e] = true;
+                    ISAAC_ELEM_ALL_TRUE_BREAK( loop_finish.array )
+                }
             }
+            #if ISAAC_SHOWBORDER == 1
+                ISAAC_ELEM_ITERATE(e)
+                    if (color.data[e].value.w <= isaac_float(0.99))
+                    {
+                        oma.array[e] = isaac_float(1) - color.data[e].value.w;
+                        color_add.data[e].value.x = 0;
+                        color_add.data[e].value.y = 0;
+                        color_add.data[e].value.z = 0;
+                        color_add.data[e].value.w = oma.array[e] * factor.array[e] * isaac_float(10);
+                        color.data[e] = color.data[e] + color_add.data[e];
+                    }
+            #endif
+            ISAAC_ELEM_ITERATE(e)
+                if (!finish.array[e])
+                    ISAAC_SET_COLOR( pixels[pixel.data[e].value.x + pixel.data[e].value.y * framebuffer_size.value.x], color.data[e] )
         }
 #if ISAAC_ALPAKA == 1
     };

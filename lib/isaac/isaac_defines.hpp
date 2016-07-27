@@ -91,7 +91,9 @@
     #define ISAAC_NO_HOST_DEVICE_WARNING
 #endif
 
-#define ISAAC_ELEM_ITERATE( NAME ) for (isaac_uint NAME = 0; NAME < isaac_uint(ISAAC_VECTOR_ELEM); NAME++)
+#define ISAAC_ELEM_ITERATE_LEN( NAME, LEN ) for (isaac_uint NAME = 0; NAME < isaac_uint(LEN); NAME++)
+
+#define ISAAC_ELEM_ITERATE( NAME ) ISAAC_ELEM_ITERATE_LEN( NAME, ISAAC_VECTOR_ELEM )
 
 #define ISAAC_ELEM_ALL_TRUE_RETURN( NAME ) \
 { \
@@ -102,6 +104,17 @@
     if (all_true) \
         return; \
 }
+
+#define ISAAC_ELEM_ALL_TRUE_BREAK( NAME ) \
+{ \
+    bool all_true = true; \
+    for (isaac_uint e = 0; e < isaac_uint(ISAAC_VECTOR_ELEM); e++) \
+        if (NAME[e] == false) \
+            all_true = false; \
+    if (all_true) \
+        break; \
+}
+
 
 #if ISAAC_ALPAKA == 1
     #define ISAAC_CONSTANT ALPAKA_STATIC_DEV_MEM_CONSTANT
