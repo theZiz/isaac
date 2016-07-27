@@ -190,12 +190,12 @@ ISAAC_HOST_DEVICE_INLINE VectorArray<isaac_float,1,isaac_vector_elem> get_value 
         if (TSource::persistent)
         {
             ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
-                if (!loop_finish.array[e])
+                if ( ISAAC_CHECK_FINISH(loop_finish) )
                     data.data[e] = source[coord.data[e]];
         }
         else
             ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
-                if (!loop_finish.array[e])
+                if ( ISAAC_CHECK_FINISH(loop_finish) )
                     data.data[e] = ptr[coord.data[e].value.x + ISAAC_GUARD_SIZE + (coord.data[e].value.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.data[e].value.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
     }
     else
@@ -226,12 +226,12 @@ ISAAC_HOST_DEVICE_INLINE VectorArray<isaac_float,1,isaac_vector_elem> get_value 
                     if (TSource::persistent)
                     {
                         ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
-                            if (!loop_finish.array[e])
+                            if ( ISAAC_CHECK_FINISH(loop_finish) )
                                 data8[x][y][z].data[e] = source[coord.data[e]];
                     }
                     else
                         ISAAC_ELEM_ITERATE_LEN(e,isaac_vector_elem)
-                            if (!loop_finish.array[e])
+                            if ( ISAAC_CHECK_FINISH(loop_finish) )
                                 data8[x][y][z].data[e] = ptr[coord.data[e].value.x + ISAAC_GUARD_SIZE + (coord.data[e].value.y + ISAAC_GUARD_SIZE) * (local_size.value.x + 2 * ISAAC_GUARD_SIZE) + (coord.data[e].value.z + ISAAC_GUARD_SIZE) * ( (local_size.value.x + 2 * ISAAC_GUARD_SIZE) * (local_size.value.y + 2 * ISAAC_GUARD_SIZE) )];
                 }
         VectorArray<float, 3, isaac_vector_elem > pos_in_cube;
@@ -353,7 +353,7 @@ struct merge_source_iterator
             if (TIsoSurface)
             {
                 ISAAC_ELEM_ITERATE(e)
-                    if (value.data[e].value.w >= isaac_float(0.5) && !loop_finish.array[e])
+                    if (value.data[e].value.w >= isaac_float(0.5) && ISAAC_CHECK_FINISH(loop_finish))
                     {
                         VectorArray<float,3,1>  left = {-1, 0, 0};
                         left.data[0] = left.data[0] + pos.data[e];
@@ -540,7 +540,7 @@ template <
                 isaac_for_each_with_mpl_params( sources, check_no_source_iterator<TFilter>(), at_least_one.array[e] );
                 if (!at_least_one.array[e])
                 {
-                    if (!finish.array[e])
+                    if ( ISAAC_CHECK_FINISH(finish) )
                         ISAAC_SET_COLOR( pixels[pixel.data[e].value.x + pixel.data[e].value.y * framebuffer_size.value.x], color.data[e] )
                     finish.array[e] = true;
                 }
@@ -677,7 +677,7 @@ template <
             ISAAC_ELEM_ITERATE(e)
                 if ( count_start.data[e].value.x > count_end.data[e].value.x)
                 {
-                    if (!finish.array[e])
+                    if ( ISAAC_CHECK_FINISH(finish) )
                         ISAAC_SET_COLOR( pixels[pixel.data[e].value.x + pixel.data[e].value.y * framebuffer_size.value.x], color.data[e] )
                     finish.array[e] = true;
                 }
@@ -753,7 +753,7 @@ template <
                     {
                         if ( last.array[e] < intersection_step.array[e] )
                         {
-                            if (!finish.array[e])
+                            if ( ISAAC_CHECK_FINISH(finish) )
                                 ISAAC_SET_COLOR( pixels[pixel.data[e].value.x + pixel.data[e].value.y * framebuffer_size.value.x], color.data[e] )
                             finish.array[e] = true;
                         }
@@ -764,7 +764,7 @@ template <
                     {
                         if ( first.array[e] > intersection_step.array[e] )
                         {
-                            if (!finish.array[e])
+                            if ( ISAAC_CHECK_FINISH(finish) )
                                 ISAAC_SET_COLOR( pixels[pixel.data[e].value.x + pixel.data[e].value.y * framebuffer_size.value.x], color.data[e] )
                             finish.array[e] = true;
                         }
@@ -792,7 +792,7 @@ template <
             for (VectorArray<isaac_int,1,ISAAC_VECTOR_ELEM> i = first;; i = i + 1)
             {
                 ISAAC_ELEM_ITERATE(e)
-                    if (!loop_finish.array[e] && i.array[e] > last.array[e])
+                    if (ISAAC_CHECK_FINISH(loop_finish) && i.array[e] > last.array[e])
                     {
                         loop_finish.array[e] = true;
                     }
@@ -847,7 +847,7 @@ template <
                     ISAAC_ELEM_ITERATE(e)
                         color_add.data[e].value.w = oma.array[e] * value.data[e].value.w;
                     ISAAC_ELEM_ITERATE(e)
-                        if (!loop_finish.array[e])
+                        if ( ISAAC_CHECK_FINISH(loop_finish) )
                             color.data[e] = color.data[e] + color_add.data[e];
                     ISAAC_ELEM_ITERATE(e)
                         if (color.data[e].value.w > isaac_float(0.99))
@@ -868,7 +868,7 @@ template <
                     }
             #endif
             ISAAC_ELEM_ITERATE(e)
-                if (!finish.array[e])
+                if ( ISAAC_CHECK_FINISH(finish) )
                     ISAAC_SET_COLOR( pixels[pixel.data[e].value.x + pixel.data[e].value.y * framebuffer_size.value.x], color.data[e] )
         }
 #if ISAAC_ALPAKA == 1

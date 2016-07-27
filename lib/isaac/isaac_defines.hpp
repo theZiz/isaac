@@ -115,6 +115,12 @@
         break; \
 }
 
+#if ISAAC_VECTOR_ELEM == 1
+    #define ISAAC_CHECK_FINISH(finish) true
+#else
+    #define ISAAC_CHECK_FINISH(finish) !finish.array[e]
+#endif
+
 
 #if ISAAC_ALPAKA == 1
     #define ISAAC_CONSTANT ALPAKA_STATIC_DEV_MEM_CONSTANT
