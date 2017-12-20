@@ -76,4 +76,27 @@ struct StereoController
 	bool send_stereo;
 };
 
+template <typename DrawController, typename FftSubController>
+struct FftController
+{
+	static const int pass_count = DrawController::pass_count + FftSubController::pass_count;
+	FftController() :
+		drawController{},
+		fftSubController{}
+	{}
+	inline bool updateProjection( IceTDouble * const projection, const isaac_size2 & framebuffer_size, json_t * const message, const bool first = false)
+	{
+		return
+			drawController.updateProjection( projection, framebuffer_size, message, first ) ||
+			fftSubController.updateProjection( projection + 16 * DrawController::pass_count, framebuffer_size, message, first );
+	}
+	inline void sendFeedback( json_t * const json_root, bool force = false )
+	{
+		drawController.sendFeedback( json_root, force );
+		fftSubController.sendFeedback( json_root, force );
+	}
+	DrawController drawController;
+	FftSubController fftSubController;
+};
+
 } //namespace isaac;

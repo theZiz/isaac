@@ -308,11 +308,13 @@ int main(int argc, char **argv)
 		std::vector<float>, //user defined type of scaling
 
 		#if (ISAAC_STEREO == 0)
-			isaac::DefaultController,
+			//isaac::DefaultController,
 			//isaac::OrthoController,
+			isaac::FftController<isaac::DefaultController,isaac::OrthoController>,
 			isaac::DefaultCompositor
 		#else
-			isaac::StereoController,
+			//isaac::StereoController,
+			isaac::FftController<isaac::StereoController,isaac::OrthoController>,
 			#if (ISAAC_STEREO == 1)
 				isaac::StereoCompositorSideBySide<isaac::StereoController>
 			#else
