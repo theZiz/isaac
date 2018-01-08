@@ -56,6 +56,14 @@
 #include "isaac/isaac_compositors.hpp"
 #include "isaac/isaac_compositors.hpp"
 #include "isaac/isaac_version.hpp"
+#include "simple_fft/fft_settings.h"
+#ifndef __USE_SQUARE_BRACKETS_FOR_ELEMENT_ACCESS_OPERATOR
+#define __USE_SQUARE_BRACKETS_FOR_ELEMENT_ACCESS_OPERATOR
+#endif
+#include "simple_fft/fft.h"
+
+#define FFT_SIZE 256
+#define FFT_SOURCE 1
 
 namespace isaac
 {
@@ -419,7 +427,8 @@ class IsaacVisualization
             framebuffer_prod(ISAAC_IDX_TYPE(framebuffer_size.x) * ISAAC_IDX_TYPE(framebuffer_size.y)),
             sources( sources ),
             scale( scale ),
-            icet_bounding_box( true )
+            icet_bounding_box( true ),
+            fft_send((float*)malloc(ISAAC_IDX_TYPE(FFT_SIZE*FFT_SIZE) *sizeof(float)))
             #if ISAAC_ALPAKA == 1
                 ,framebuffer(alpaka::mem::buf::alloc<uint32_t, ISAAC_IDX_TYPE>(acc, framebuffer_prod))
                 ,functor_chain_d(alpaka::mem::buf::alloc<isaac_functor_chain_pointer_N, ISAAC_IDX_TYPE>(acc, ISAAC_IDX_TYPE( ISAAC_FUNCTOR_COMPLEX * 4)))
@@ -441,6 +450,13 @@ class IsaacVisualization
                 //debugging reasons let's alloc 4 extra bytes for valgrind:
                 json_set_alloc_funcs(extra_malloc, extra_free);
             #endif
+            fft_framebuffer.resize(FFT_SIZE);
+            fft_complex.resize(FFT_SIZE);
+            for (size_t i = 0; i < FFT_SIZE;++i)
+            {
+                fft_framebuffer[i].resize(FFT_SIZE);
+                fft_complex[i].resize(FFT_SIZE);
+            }
             json_object_seed(0);
             for (int i = 0; i < 3; i++)
             {
@@ -566,7 +582,10 @@ class IsaacVisualization
                 icetCompositeMode(ICET_COMPOSITE_MODE_BLEND);
                 icetEnable(ICET_ORDERED_COMPOSITE);
                 icetPhysicalRenderSize(framebuffer_size.x, framebuffer_size.y);
-                icetDrawCallback( drawCallBack );
+                if (pass < TController::pass_count-1)
+                    icetDrawCallback( drawCallBack<-1> );
+                else
+                    icetDrawCallback( drawCallBack<FFT_SOURCE> );
             }
             icetDestroyMPICommunicator(icetComm);
             updateBounding( );
@@ -1342,6 +1361,23 @@ class IsaacVisualization
                     MPI_Gather( message_buffer, ISAAC_MAX_RECEIVE, MPI_CHAR, NULL, 0,  MPI_CHAR, master, mpi_world);
             }
 
+            //fft reduction
+            MPI_Reduce(
+                (rank == master)?MPI_IN_PLACE:fft_send,(rank == master)?fft_send:NULL,
+                ISAAC_IDX_TYPE(FFT_SIZE*FFT_SIZE),
+                MPI_FLOAT,MPI_SUM,master,mpi_world);
+            for (int y = 0; y < FFT_SIZE; ++y)
+                for (int x = 0; x < FFT_SIZE; ++x)
+                    fft_framebuffer[y][x] = fft_send[x+y*FFT_SIZE];
+            const char * error = NULL;
+            simple_fft::FFT(fft_framebuffer,fft_complex,size_t(FFT_SIZE),size_t(FFT_SIZE),error);
+            for (int y = 0; y < FFT_SIZE; ++y)
+                for (int x = 0; x < FFT_SIZE; ++x)
+                {
+                    const auto r = fft_complex[y][x].real();
+                    const auto i = fft_complex[y][x].imag();
+                    fft_send[x+y*FFT_SIZE] = fabs(r*r+2.0*r*i+i*i);
+                }
             #ifdef ISAAC_THREADING
                 pthread_create(&visualizationThread,NULL,visualizationFunction,NULL);
             #else
@@ -1377,6 +1413,7 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaFree( functor_chain_choose_d ) );
                 ISAAC_CUDA_CHECK(cudaFree( local_minmax_array_d ) );
             #endif
+            free( fft_send );
             delete communicator;
             json_decref(json_init_root);
         }
@@ -1394,6 +1431,7 @@ class IsaacVisualization
         uint64_t sorting_time;
         uint64_t buffer_time;
     private:
+        template <int fft_number>
         static void drawCallBack(
             const IceTDouble * projection_matrix,
             const IceTDouble * modelview_matrix,
@@ -1477,6 +1515,8 @@ class IsaacVisualization
                 isaac_uint( readback_viewport[1] )
             };
             #if ISAAC_ALPAKA == 1
+                if (fft_number >= 0)
+                    alpaka::mem::view::set(myself->stream,myself->framebuffer,0,alpaka::vec::Vec<TFraDim, ISAAC_IDX_TYPE>(myself->framebuffer_prod));
                 IsaacRenderKernelCaller
                 <
                     TSimDim,
@@ -1488,6 +1528,7 @@ class IsaacVisualization
                     alpaka::mem::buf::Buf<TDevAcc, uint32_t, TFraDim, ISAAC_IDX_TYPE>,
                     TTransfer_size,
                     isaac_float3,
+                    fft_number,
                     TAccDim,
                     TAcc,
                     TStream,
@@ -1517,6 +1558,8 @@ class IsaacVisualization
                 alpaka::mem::view::ViewPlainPtr<THost, uint32_t, TFraDim, ISAAC_IDX_TYPE> result_buffer((uint32_t*)(pixels), myself->host, alpaka::vec::Vec<TFraDim, ISAAC_IDX_TYPE>(myself->framebuffer_prod));
                 alpaka::mem::view::copy(myself->stream, result_buffer, myself->framebuffer, alpaka::vec::Vec<TFraDim, ISAAC_IDX_TYPE>(myself->framebuffer_prod));
             #else
+                if (fft_number >= 0)
+                    cudaMemset(myself->framebuffer,0,sizeof(uint32_t)*myself->framebuffer_prod);
                 IsaacRenderKernelCaller
                 <
                     TSimDim,
@@ -1528,6 +1571,7 @@ class IsaacVisualization
                     uint32_t*,
                     TTransfer_size,
                     isaac_float3,
+                    fft_number,
                     boost::mpl::size< TSourceList >::type::value
                 >
                 ::call(
@@ -1552,6 +1596,26 @@ class IsaacVisualization
                 ISAAC_CUDA_CHECK(cudaMemcpy((uint32_t*)(pixels), myself->framebuffer, sizeof(uint32_t)*myself->framebuffer_prod, cudaMemcpyDeviceToHost));
             #endif
             ISAAC_STOP_TIME_MEASUREMENT( myself->copy_time, +=, copy, myself->getTicksUs() )
+            if (fft_number >= 0)
+            {
+                float* pixels_f = reinterpret_cast<float*>(pixels);
+                auto scale = min(myself->framebuffer_size.x / FFT_SIZE,myself->framebuffer_size.y / FFT_SIZE);
+                auto add_x = (myself->framebuffer_size.x-scale*FFT_SIZE)/2;
+                auto add_y = (myself->framebuffer_size.y-scale*FFT_SIZE)/2;
+                for (int y = 0; y < FFT_SIZE; ++y)
+                    for (int x = 0; x < FFT_SIZE; ++x)
+                    {
+                        float sum = 0.0f;
+                        for (int b = 0; b < scale; ++b)
+                            for (int a = 0; a < scale; ++a)
+                            {
+                                const auto gx = add_x+x*scale+a;
+                                const auto gy = add_y+y*scale+b;
+                                sum += pixels_f[gx+gy*myself->framebuffer_size.x];
+                            }
+                        myself->fft_send[x+y*FFT_SIZE] = sum;
+                    }
+            }
         }
 
         static void* visualizationFunction(void* dummy)
@@ -1700,6 +1764,33 @@ class IsaacVisualization
                 myself->controller.sendFeedback( myself->json_root, myself->send_controller );
                 if ( myself->send_init_json )
                     json_object_set( myself->json_root,"init",myself->json_init_root );
+
+                if (myself->image[TController::pass_count-1].opaque_internals)
+                {
+                    using namespace boost::archive::iterators;
+                    std::stringstream payload;
+                    typedef
+                    base64_from_binary
+                    <
+                        transform_width
+                        <
+                            const unsigned char *,
+                            6,
+                            8
+                        >
+                    >
+                    base64_text; // compose all the above operations in to a new iterator
+                    std::copy(
+                        base64_text( (char*)myself->fft_send ),
+                        base64_text( (char*)myself->fft_send + ISAAC_IDX_TYPE(FFT_SIZE*FFT_SIZE) * sizeof(float) ),
+                        boost::archive::iterators::ostream_iterator<char>(payload)
+                    );
+                    json_object_set_new( myself->json_meta_root, "radiation sum field", json_string( payload.str().c_str() ) );
+                    json_object_set_new( myself->json_meta_root, "radiation sum field x", json_integer( FFT_SIZE ) );
+                    json_object_set_new( myself->json_meta_root, "radiation sum field y", json_integer( FFT_SIZE ) );
+                }
+
+
                 char* buffer = json_dumps( myself->json_root, 0 );
                 myself->communicator->serverSend(buffer);
                 free(buffer);
@@ -1781,6 +1872,9 @@ class IsaacVisualization
             isaac_functor_chain_pointer_N* functor_chain_choose_d;
             minmax_struct* local_minmax_array_d;
         #endif
+        std::vector< std::vector<double> > fft_framebuffer;
+        std::vector< std::vector< std::complex<double> > > fft_complex;
+        float* fft_send;
         TDomainSize global_size;
         TDomainSize local_size;
         TDomainSize position;

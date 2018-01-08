@@ -168,8 +168,8 @@ int main(int argc, char **argv)
 	//This defines the size of the generated rendering
 	isaac_size2 framebuffer_size =
 	{
-		ISAAC_IDX_TYPE(800),
-		ISAAC_IDX_TYPE(600)
+		ISAAC_IDX_TYPE(1024),
+		ISAAC_IDX_TYPE(768)
 	};
 
 	#if ISAAC_ALPAKA == 1
@@ -338,7 +338,6 @@ int main(int argc, char **argv)
 		sources, //instances of the sources to render
 		scaling
 	);
-
 	//Setting up the metadata description (only master, but however slaves could then add metadata, too, it would be merged)
 	if (rank == 0)
 	{

@@ -27,6 +27,8 @@
 #include <boost/fusion/include/push_back.hpp>
 #include <boost/mpl/size.hpp>
 
+#include <boost/fusion/include/at_c.hpp>
+
 #include <float.h>
 
 #pragma GCC diagnostic push
@@ -161,7 +163,8 @@ template <
     typename TPos,
     typename TPointerArray,
     typename TLocalSize,
-    typename TScale
+    typename TScale,
+    bool use_functor_chain = true
 >
 ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
     const TSource& source,
@@ -242,16 +245,23 @@ ISAAC_HOST_DEVICE_INLINE isaac_float get_value (
     }
     isaac_float result = isaac_float(0);
 
-    #if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
-        if (TSource::feature_dim == 1)
-            result = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<1>* >(&data)), NR::value );
-        if (TSource::feature_dim == 2)
-            result = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<2>* >(&data)), NR::value );
-        if (TSource::feature_dim == 3)
-            result = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<3>* >(&data)), NR::value );
-        if (TSource::feature_dim == 4)
-            result = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), NR::value );
-    #endif
+    if (use_functor_chain)
+    {
+        #if ISAAC_ALPAKA == 1 || defined(__CUDA_ARCH__)
+            if (TSource::feature_dim == 1)
+                result = reinterpret_cast<isaac_functor_chain_pointer_1>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<1>* >(&data)), NR::value );
+            if (TSource::feature_dim == 2)
+                result = reinterpret_cast<isaac_functor_chain_pointer_2>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<2>* >(&data)), NR::value );
+            if (TSource::feature_dim == 3)
+                result = reinterpret_cast<isaac_functor_chain_pointer_3>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<3>* >(&data)), NR::value );
+            if (TSource::feature_dim == 4)
+                result = reinterpret_cast<isaac_functor_chain_pointer_4>(isaac_function_chain_d[ NR::value ])( *(reinterpret_cast< isaac_float_dim<4>* >(&data)), NR::value );
+        #endif
+    }
+    else
+    {
+        result = IsaacFunctorLength::call(data,{0,0,0,0}).value.x;
+    }
     return result;
 }
 
@@ -477,6 +487,10 @@ struct check_no_source_iterator
     }
 };
 
+ISAAC_HOST_DEVICE_INLINE constexpr int ignore_smaller_than_0(int n)
+{
+    return n < 0 ? 0 : n;
+}
 
 template <
     typename TSimDim,
@@ -488,6 +502,7 @@ template <
     ISAAC_IDX_TYPE Ttransfer_size,
     isaac_int TInterpolation,
     isaac_int TIsoSurface,
+    int fft_number,
     typename TScale
 >
 #if ISAAC_ALPAKA == 1
@@ -812,83 +827,112 @@ template <
             isaac_float oma[ISAAC_VECTOR_ELEM];
             isaac_float4 color_add[ISAAC_VECTOR_ELEM];
 
-            ISAAC_ELEM_ITERATE(e)
+            if (fft_number >= 0)
             {
-                //Starting the main loop
-                min_size[e] = ISAAC_MIN(
-                    int(isaac_size_d[0].global_size.value.x), ISAAC_MIN (
-                    int(isaac_size_d[0].global_size.value.y),
-                    int(isaac_size_d[0].global_size.value.z) ) );
-                factor[e] = step / /*isaac_size_d[0].max_global_size*/ min_size[e] * isaac_float(2) * l[e]/l_scaled[e];
-                for (isaac_int i = first[e]; i <= last[e]; i++)
+                constexpr int real_fft_number = 0;//ignore_smaller_than_0(fft_number);
+                isaac_float fft_sum[ISAAC_VECTOR_ELEM];
+                ISAAC_ELEM_ITERATE(e)
+                if (!finish[e])
                 {
-                    pos[e] = start[e] + step_vec[e] * isaac_float(i);
-                    value[e].x = 0;
-                    value[e].y = 0;
-                    value[e].z = 0;
-                    value[e].w = 0;
-                    result[e] = 0;
-                    bool firstRound = (global_front[e] && i == first[e]);
-                    isaac_for_each_with_mpl_params
-                    (
-                        sources,
-                        merge_source_iterator
-                        <
-                            Ttransfer_size,
-                            TFilter,
-                            TInterpolation,
-                            TIsoSurface
-                        >(),
-                        value[e],
-                        pos[e],
-                        isaac_size_d[0].local_size,
-                        transferArray,
-                        sourceWeight,
-                        pointerArray,
-                        result[e],
-                        step_vec[e],
-                        step,
-                        scale,
-                        firstRound,
-                        start_normal[e]
-                    );
-                    /*if ( mpl::size< TSourceList >::type::value > 1)
-                        value = value / isaac_float( mpl::size< TSourceList >::type::value );*/
-                    if (TIsoSurface)
+                    fft_sum[e] = 0.0f;
+                    for (isaac_int i = first[e]; i <= last[e]; i++)
                     {
-                        if (result[e])
+                        auto& source = boost::fusion::at_c<real_fft_number>(sources);
+                        pos[e] = start[e] + step_vec[e] * isaac_float(i);
+                        fft_sum[e] += get_value <
+                            TInterpolation,
+                            mpl::int_<real_fft_number>,
+                            std::remove_reference<decltype(source)>::type,
+                            isaac_float3,
+                            TPointerArray,
+                            isaac_size_dim < 3 >,
+                            TScale,
+                            false
+                        >( source, pos[e], pointerArray, isaac_size_d[0].local_size, scale );
+                    }
+                    reinterpret_cast<float*>(pixels)[pixel[e].x + pixel[e].y * framebuffer_size.x] =
+                        fft_sum[e];
+                }
+            }
+            else
+            {
+                ISAAC_ELEM_ITERATE(e)
+                {
+                    //Starting the main loop
+                    min_size[e] = ISAAC_MIN(
+                        int(isaac_size_d[0].global_size.value.x), ISAAC_MIN (
+                        int(isaac_size_d[0].global_size.value.y),
+                        int(isaac_size_d[0].global_size.value.z) ) );
+                    factor[e] = step / min_size[e] * isaac_float(2) * l[e]/l_scaled[e];
+                    for (isaac_int i = first[e]; i <= last[e]; i++)
+                    {
+                        pos[e] = start[e] + step_vec[e] * isaac_float(i);
+                        value[e].x = 0;
+                        value[e].y = 0;
+                        value[e].z = 0;
+                        value[e].w = 0;
+                        result[e] = 0;
+                        bool firstRound = (global_front[e] && i == first[e]);
+                        isaac_for_each_with_mpl_params
+                        (
+                            sources,
+                            merge_source_iterator
+                            <
+                                Ttransfer_size,
+                                TFilter,
+                                TInterpolation,
+                                TIsoSurface
+                            >(),
+                            value[e],
+                            pos[e],
+                            isaac_size_d[0].local_size,
+                            transferArray,
+                            sourceWeight,
+                            pointerArray,
+                            result[e],
+                            step_vec[e],
+                            step,
+                            scale,
+                            firstRound,
+                            start_normal[e]
+                        );
+                        /*if ( mpl::size< TSourceList >::type::value > 1)
+                            value = value / isaac_float( mpl::size< TSourceList >::type::value );*/
+                        if (TIsoSurface)
                         {
-                            color[e] = value[e];
-                            break;
+                            if (result[e])
+                            {
+                                color[e] = value[e];
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            oma[e] = isaac_float(1) - color[e].w;
+                            value[e] = value[e] * factor[e];
+                            color_add[e].x = oma[e] * value[e].x; // * value.w does merge_source_iterator
+                            color_add[e].y = oma[e] * value[e].y; // * value.w does merge_source_iterator
+                            color_add[e].z = oma[e] * value[e].z; // * value.w does merge_source_iterator
+                            color_add[e].w = oma[e] * value[e].w;
+                            color[e] = color[e] + color_add[e];
+                            if (color[e].w > isaac_float(0.99))
+                                break;
                         }
                     }
-                    else
-                    {
-                        oma[e] = isaac_float(1) - color[e].w;
-                        value[e] = value[e] * factor[e];
-                        color_add[e].x = oma[e] * value[e].x; // * value.w does merge_source_iterator
-                        color_add[e].y = oma[e] * value[e].y; // * value.w does merge_source_iterator
-                        color_add[e].z = oma[e] * value[e].z; // * value.w does merge_source_iterator
-                        color_add[e].w = oma[e] * value[e].w;
-                        color[e] = color[e] + color_add[e];
-                        if (color[e].w > isaac_float(0.99))
-                            break;
-                    }
+                    #if ISAAC_SHOWBORDER == 1
+                        if (color[e].w <= isaac_float(0.99))
+                        {
+                            oma[e] = isaac_float(1) - color[e].w;
+                            color_add[e].x = 0;
+                            color_add[e].y = 0;
+                            color_add[e].z = 0;
+                            color_add[e].w = oma[e] * factor[e] * isaac_float(10);
+                            color[e] = color[e] + color_add[e];
+                        }
+                    #endif
+                    if (!finish[e])
+                        ISAAC_SET_COLOR( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], color[e] )
                 }
-                #if ISAAC_SHOWBORDER == 1
-                    if (color[e].w <= isaac_float(0.99))
-                    {
-                        oma[e] = isaac_float(1) - color[e].w;
-                        color_add[e].x = 0;
-                        color_add[e].y = 0;
-                        color_add[e].z = 0;
-                        color_add[e].w = oma[e] * factor[e] * isaac_float(10);
-                        };
-                        color[e] = color[e] + color_add[e];
-                    }
-                #endif
-                if (!finish[e])
-                    ISAAC_SET_COLOR( pixels[pixel[e].x + pixel[e].y * framebuffer_size.x], color[e] )
             }
         }
 #if ISAAC_ALPAKA == 1
@@ -905,6 +949,7 @@ template <
     typename TFramebuffer,
     ISAAC_IDX_TYPE TTransfer_size,
     typename TScale,
+    int fft_number,
 #if ISAAC_ALPAKA == 1
     typename TAccDim,
     typename TAcc,
@@ -947,6 +992,7 @@ struct IsaacRenderKernelCaller
                 TFramebuffer,
                 TTransfer_size,
                 TScale,
+                fft_number,
 #if ISAAC_ALPAKA == 1
                 TAccDim,
                 TAcc,
@@ -986,6 +1032,7 @@ struct IsaacRenderKernelCaller
                 TFramebuffer,
                 TTransfer_size,
                 TScale,
+                fft_number,
 #if ISAAC_ALPAKA == 1
                 TAccDim,
                 TAcc,
@@ -1025,7 +1072,8 @@ template <
     typename TFilter,
     typename TFramebuffer,
     ISAAC_IDX_TYPE TTransfer_size,
-    typename TScale
+    typename TScale,
+    int fft_number
 #if ISAAC_ALPAKA == 1
     ,typename TAccDim
     ,typename TAcc
@@ -1044,6 +1092,7 @@ struct IsaacRenderKernelCaller
     TFramebuffer,
     TTransfer_size,
     TScale,
+    fft_number,
 #if ISAAC_ALPAKA == 1
     TAccDim,
     TAcc,
@@ -1109,6 +1158,7 @@ struct IsaacRenderKernelCaller
                     TFilter, \
                     TTransfer_size,
             #define ISAAC_KERNEL_END \
+                    ,fft_number \
                     ,TScale \
                 > \
                 kernel; \
@@ -1147,6 +1197,7 @@ struct IsaacRenderKernelCaller
                     TFilter, \
                     TTransfer_size,
             #define ISAAC_KERNEL_END \
+                    ,fft_number \
                 > \
                 <<<grid, block>>> \
                 ( \
