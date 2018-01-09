@@ -829,7 +829,7 @@ template <
 
             if (fft_number >= 0)
             {
-                constexpr int real_fft_number = 0;//ignore_smaller_than_0(fft_number);
+                constexpr int real_fft_number = ignore_smaller_than_0(fft_number);
                 isaac_float fft_sum[ISAAC_VECTOR_ELEM];
                 ISAAC_ELEM_ITERATE(e)
                 if (!finish[e])
