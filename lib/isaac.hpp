@@ -64,6 +64,7 @@
 
 #define FFT_SIZE 256
 #define FFT_SOURCE 1
+#define FFT_SUM_PASSES 10
 
 namespace isaac
 {
@@ -451,12 +452,11 @@ class IsaacVisualization
                 json_set_alloc_funcs(extra_malloc, extra_free);
             #endif
             fft_framebuffer.resize(FFT_SIZE);
-            fft_complex.resize(FFT_SIZE);
-            for (size_t i = 0; i < FFT_SIZE;++i)
-            {
-                fft_framebuffer[i].resize(FFT_SIZE);
-                fft_complex[i].resize(FFT_SIZE);
-            }
+            fft_complex.resize(FFT_SUM_PASSES+1);
+            for (int p = 0; p <= FFT_SUM_PASSES; p++)
+                for (int y = 0; y < FFT_SIZE; ++y)
+                    for (int x = 0; x < FFT_SIZE; ++x)
+                        fft_complex[p][y][x] = std::complex<double>(0,0);
             json_object_seed(0);
             for (int i = 0; i < 3; i++)
             {
@@ -1366,18 +1366,32 @@ class IsaacVisualization
                 (rank == master)?MPI_IN_PLACE:fft_send,(rank == master)?fft_send:NULL,
                 ISAAC_IDX_TYPE(FFT_SIZE*FFT_SIZE),
                 MPI_FLOAT,MPI_SUM,master,mpi_world);
-            for (int y = 0; y < FFT_SIZE; ++y)
-                for (int x = 0; x < FFT_SIZE; ++x)
-                    fft_framebuffer[y][x] = fft_send[x+y*FFT_SIZE];
-            const char * error = NULL;
-            simple_fft::FFT(fft_framebuffer,fft_complex,size_t(FFT_SIZE),size_t(FFT_SIZE),error);
-            for (int y = 0; y < FFT_SIZE; ++y)
-                for (int x = 0; x < FFT_SIZE; ++x)
-                {
-                    const auto r = fft_complex[y][x].real();
-                    const auto i = fft_complex[y][x].imag();
-                    fft_send[x+y*FFT_SIZE] = fabs(r*r+2.0*r*i+i*i);
-                }
+            if (rank == master && image[TController::pass_count-1].opaque_internals)
+            {
+                for (int y = 0; y < FFT_SIZE; ++y)
+                    for (int x = 0; x < FFT_SIZE; ++x)
+                        fft_framebuffer[y][x] = fft_send[x+y*FFT_SIZE];
+                //remove oldest element
+                for (int y = 0; y < FFT_SIZE; ++y)
+                    for (int x = 0; x < FFT_SIZE; ++x)
+                        fft_complex[0][y][x] -= fft_complex[FFT_SUM_PASSES][y][x];
+                //rotate to the right (0->1, 1->2, etc.)
+                std::rotate(fft_complex.rbegin(), fft_complex.rbegin() + 1, fft_complex.rend() - 1);
+                //set newest element to fft
+                const char * error = NULL;
+                simple_fft::FFT(fft_framebuffer,fft_complex[1],size_t(FFT_SIZE),size_t(FFT_SIZE),error);
+                //add newest element to sum
+                for (int y = 0; y < FFT_SIZE; ++y)
+                    for (int x = 0; x < FFT_SIZE; ++x)
+                        fft_complex[0][y][x] += fft_complex[1][y][x];
+                for (int y = 0; y < FFT_SIZE; ++y)
+                    for (int x = 0; x < FFT_SIZE; ++x)
+                    {
+                        const auto r = fft_complex[0][y][x].real();
+                        const auto i = fft_complex[0][y][x].imag();
+                        fft_send[x+y*FFT_SIZE] = fabs(r*r+2.0*r*i+i*i);
+                    }
+            }
             #ifdef ISAAC_THREADING
                 pthread_create(&visualizationThread,NULL,visualizationFunction,NULL);
             #else
@@ -1872,8 +1886,8 @@ class IsaacVisualization
             isaac_functor_chain_pointer_N* functor_chain_choose_d;
             minmax_struct* local_minmax_array_d;
         #endif
-        std::vector< std::vector<double> > fft_framebuffer;
-        std::vector< std::vector< std::complex<double> > > fft_complex;
+        std::vector< std::array<double, FFT_SIZE> > fft_framebuffer;
+        std::vector< std::array< std::array< std::complex<double>, FFT_SIZE >, FFT_SIZE > > fft_complex;
         float* fft_send;
         TDomainSize global_size;
         TDomainSize local_size;
