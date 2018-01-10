@@ -1389,7 +1389,9 @@ class IsaacVisualization
                     {
                         const auto r = fft_complex[0][y][x].real();
                         const auto i = fft_complex[0][y][x].imag();
-                        fft_send[x+y*FFT_SIZE] = fabs(r*r+2.0*r*i+i*i);
+                        const auto X = (x+FFT_SIZE/2)%FFT_SIZE;
+                        const auto Y = (y+FFT_SIZE/2)%FFT_SIZE;
+                        fft_send[X+Y*FFT_SIZE] = fabs(r*r+2.0*r*i+i*i);
                     }
             }
             #ifdef ISAAC_THREADING
